@@ -27,6 +27,13 @@ import (
 	"github.com/google/go-tika/tika"
 )
 
+func usage() {
+	fmt.Printf("Usage: %s action [OPTIONS]\n\n", os.Args[0])
+	fmt.Printf("Valid actions: parse, detect, language, meta, version, parsers, mimetypes, detectors\n\n")
+	fmt.Println("Options:")
+	flag.PrintDefaults()
+}
+
 // Flags requiring input.
 const (
 	parse    = "parse"
@@ -34,8 +41,6 @@ const (
 	language = "language"
 	meta     = "meta"
 )
-
-var inputActions = []string{parse, detect, language, meta}
 
 // Informational flags which don't require input.
 const (
@@ -45,21 +50,24 @@ const (
 	detectors = "detectors"
 )
 
-var infoActions = []string{version, parsers, mimeTypes, detectors}
-
 // Command line flags.
 var (
-	filename        = flag.String("filename", "", "Path to file to parse.")
-	serverURL       = flag.String("serverURL", "", "URL of Tika server.")
-	action          = flag.String("action", "version", fmt.Sprintf(`Action to perform. One of %v with -filename or one of %v without -filename. When using "parse" or "meta", the -recursive and -field flags can provide finer control.`, inputActions, infoActions))
-	metaField       = flag.String("field", "", `Specific field to get when using the "meta" action. Undefined when using the -recursive flag.`)
-	serverJAR       = flag.String("serverJAR", "", "Absolute path to the Tika Server JAR. This will start a new server, ignoring -serverURL.")
 	downloadVersion = flag.String("downloadVersion", "", "Tika Server JAR version to download. If -serverJAR is specified, it will be downloaded to that location, otherwise it will be downloaded to your working directory. If the JAR has already been downloaded and has the correct MD5, this will do nothing. Valid versions: 1.14.")
+	filename        = flag.String("filename", "", "Path to file to parse.")
+	metaField       = flag.String("field", "", `Specific field to get when using the "meta" action. Undefined when using the -recursive flag.`)
 	recursive       = flag.Bool("recursive", false, `Whether to run "parse" or "meta" recursively, returning a list with one element per embedded document. Undefined when using the -field flag.`)
+	serverJAR       = flag.String("serverJAR", "", "Absolute path to the Tika Server JAR. This will start a new server, ignoring -serverURL.")
+	serverURL       = flag.String("serverURL", "", "URL of Tika server.")
 )
 
 func main() {
+	flag.Usage = usage
 	flag.Parse()
+	if flag.NArg() != 1 {
+		flag.Usage()
+		os.Exit(1)
+	}
+	action := flag.Arg(0)
 
 	if *downloadVersion != "" {
 		if *serverJAR == "" {
@@ -91,7 +99,7 @@ func main() {
 	var err error
 
 	// Check actions requiring input have an input and get it.
-	switch *action {
+	switch action {
 	case parse, detect, language, meta:
 		if *filename == "" {
 			log.Fatalf("error: you must provide an input filename")
@@ -104,10 +112,10 @@ func main() {
 
 	c := tika.NewClient(nil, url)
 
-	switch *action {
+	switch action {
 	default:
 		flag.Usage()
-		log.Fatalf("error: invalid action %q", *action)
+		log.Fatalf("error: invalid action %q", action)
 	case parse:
 		if *recursive {
 			body, err = c.ParseRecursive(file)
@@ -131,27 +139,27 @@ func main() {
 	case parsers:
 		body, err = c.Parsers()
 		if err != nil {
-			log.Fatalf("tika %v error: %v", *action, err)
+			log.Fatalf("tika %v error: %v", action, err)
 		}
 		body, err = json.MarshalIndent(body, "", "  ")
 		body = string(body.([]byte))
 	case mimeTypes:
 		body, err = c.MimeTypes()
 		if err != nil {
-			log.Fatalf("tika %v error: %v", *action, err)
+			log.Fatalf("tika %v error: %v", action, err)
 		}
 		body, err = json.MarshalIndent(body, "", "  ")
 		body = string(body.([]byte))
 	case detectors:
 		body, err = c.Detectors()
 		if err != nil {
-			log.Fatalf("tika %v error: %v\n", *action, err)
+			log.Fatalf("tika %v error: %v\n", action, err)
 		}
 		body, err = json.MarshalIndent(body, "", "  ")
 		body = string(body.([]byte))
 	}
 	if err != nil {
-		log.Fatalf("tika %q error: %v\n", *action, err)
+		log.Fatalf("tika %q error: %v\n", action, err)
 	}
 	fmt.Println(body)
 }
