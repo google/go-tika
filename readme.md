@@ -33,7 +33,7 @@ s, err := tika.StartServer("tika-server-1.14.jar", nil)
 if err != nil {
 	log.Fatal(err)
 }
-defer s.Shutdown()
+defer s.Close()
 ```
 
 Open any io.Reader:

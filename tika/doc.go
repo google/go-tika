@@ -37,7 +37,7 @@ If you don't have a running Tika Server, you can start one.
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer s.Shutdown()
+	defer s.Close()
 
 Pass a *tika.ServerConfig to control the Server's behavior.
 
