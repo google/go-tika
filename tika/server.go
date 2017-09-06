@@ -29,14 +29,18 @@ import (
 	"time"
 )
 
-// Server represents a running Tika server. Start a new Server with StartServer and
-// shut it down with Close. There is no need to create a Server for an already
-// running Tika Server - you can pass its URL directly to a Client.
+// Server represents a Tika server. Create a new Server with NewServer,
+// start it with StartServer, and shut it down with Close.
+// There is no need to create a Server for an already running Tika Server
+// since you can pass its URL directly to a Client.
 type Server struct {
-	url     string
-	cmd     *exec.Cmd
-	done    chan error
-	timeout time.Duration
+	jar      string
+	url      string // url is derived from port and hostname.
+	port     string
+	hostname string
+	cmd      *exec.Cmd
+	done     chan error
+	timeout  time.Duration
 }
 
 // URL returns the URL of this Server.
@@ -44,11 +48,29 @@ func (s *Server) URL() string {
 	return s.url
 }
 
-// A ServerConfig can be used to configure a Server before starting it.
-type ServerConfig struct {
-	Port     string        // Port is the port the Server will run on (default "9998").
-	Timeout  time.Duration // How long to wait for the server to start (default 10s).
-	Hostname string        // The host name to use (default localhost).
+// A Option can be passed to NewServer to configure the Server.
+type Option func(*Server)
+
+// WithHostname returns a Option to set the host of the Server.
+func WithHostname(h string) Option {
+	return func(s *Server) {
+		s.hostname = h
+	}
+}
+
+// WithPort returns a Option to set the port of the Server.
+func WithPort(p string) Option {
+	return func(s *Server) {
+		s.port = p
+	}
+}
+
+// WithTimeout returns a Option to set the timeout for how long to wait
+// for the Server to start.
+func WithTimeout(d time.Duration) Option {
+	return func(s *Server) {
+		s.timeout = d
+	}
 }
 
 type commander func(string, ...string) *exec.Cmd
@@ -56,67 +78,62 @@ type commander func(string, ...string) *exec.Cmd
 // cmder is used to stub out *exec.Cmd for testing.
 var cmder commander = exec.Command
 
-// StartServer creates a new Server. StartServer will start a new Java process. The
-// caller must call Close() when finished with the Server.
-func StartServer(jar string, config *ServerConfig) (*Server, error) {
+// NewServer creates a new Server.
+func NewServer(jar string, options ...Option) (*Server, error) {
 	if jar == "" {
 		return nil, fmt.Errorf("no jar file specified")
-	}
-	if config == nil {
-		config = &ServerConfig{}
-	}
-	if config.Port == "" {
-		config.Port = "9998"
-	}
-	if config.Timeout == 0 {
-		config.Timeout = 10 * time.Second
-	}
-	if config.Hostname == "" {
-		config.Hostname = "localhost"
 	}
 	if _, err := os.Stat(jar); err != nil {
 		return nil, fmt.Errorf("jar file not found: %s", jar)
 	}
-	urlString := "http://" + config.Hostname + ":" + config.Port
+	s := &Server{
+		jar:      jar,
+		port:     "9998",
+		timeout:  10 * time.Second,
+		hostname: "localhost",
+	}
+	for _, o := range options {
+		o(s)
+	}
+	urlString := "http://" + s.hostname + ":" + s.port
 	u, err := url.Parse(urlString)
 	if err != nil {
 		return nil, fmt.Errorf("invalid url %q: %v", urlString, err)
 	}
-	urlString = u.String()
+	s.url = u.String()
+	return s, nil
+}
 
-	c := cmder("java", "-jar", jar, "-p", config.Port)
+// Start starts the given server. Start will start a new Java process. The
+// caller must call Close() when finished with the Server.
+func (s *Server) Start() error {
+	s.cmd = cmder("java", "-jar", s.jar, "-p", s.port)
 	done := make(chan error, 1)
 
-	stderr, err := c.StderrPipe()
+	stderr, err := s.cmd.StderrPipe()
 	if err != nil {
-		return nil, err
-	}
-	s := &Server{
-		cmd:     c,
-		done:    done,
-		url:     urlString,
-		timeout: config.Timeout,
+		return err
 	}
 
-	if err := c.Start(); err != nil {
-		return nil, err
+	if err := s.cmd.Start(); err != nil {
+		return err
 	}
 	go func() {
-		done <- c.Wait()
+		done <- s.cmd.Wait()
 	}()
 
 	if err := s.waitForStart(); err != nil {
 		buf := new(bytes.Buffer)
 		if _, err := buf.ReadFrom(stderr); err != nil {
-			return nil, fmt.Errorf("error reading stderr: %v", err)
+			return fmt.Errorf("error reading stderr: %v", err)
 		}
-		return nil, fmt.Errorf("%v: %v", err, buf.String())
+		return fmt.Errorf("%v: %v", err, buf.String())
 	}
-	return s, nil
+	return nil
 }
 
 // waitForServer waits until the given Server is responding to requests.
-// waitForStart returns an error if the server does not respond within 10 seconds.
+// waitForStart returns an error if the server does not respond within the timeout.
 func (s Server) waitForStart() error {
 	c := NewClient(nil, s.url)
 	var err error
@@ -130,10 +147,10 @@ func (s Server) waitForStart() error {
 }
 
 // Close shuts the Server down, releasing resources. Callers are responsible
-// for calling Close after calling StartServer.
+// for calling Close after calling Start.
 func (s *Server) Close() error {
 	if s.cmd == nil {
-		return errors.New("Close called on invalid Server: did you call StartServer?")
+		return errors.New("Close called on invalid Server: did you call Start?")
 	}
 	select {
 	case err := <-s.done:
@@ -200,5 +217,4 @@ func DownloadServer(version, path string) error {
 		return fmt.Errorf("invalid md5")
 	}
 	return nil
-
 }

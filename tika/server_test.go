@@ -38,8 +38,37 @@ func init() {
 	}
 }
 
-func TestStartServer(t *testing.T) {
-	path, err := os.Executable()
+func TestNewServerError(t *testing.T) {
+	path, err := os.Executable() // Use the text executable path as a dummy jar.
+	if err != nil {
+		t.Skip("cannot find current test executable")
+	}
+	tests := []struct {
+		name    string
+		jar     string
+		options []Option
+	}{
+		{name: "no jar path"},
+		{
+			name: "invalid jar path",
+			jar:  "/invalid/jar/path.jar",
+		},
+		{
+			name:    "invalid hostname",
+			jar:     path,
+			options: []Option{WithHostname("192.168.0.%31")},
+		},
+	}
+	for _, test := range tests {
+		_, err := NewServer(test.jar, test.options...)
+		if err == nil {
+			t.Errorf("NewServer(%s) got no error", test.name)
+		}
+	}
+}
+
+func TestStart(t *testing.T) {
+	path, err := os.Executable() // Use the text executable path as a dummy jar.
 	if err != nil {
 		t.Skip("cannot find current test executable")
 	}
@@ -52,22 +81,28 @@ func TestStartServer(t *testing.T) {
 		t.Fatalf("error creating test server: %v", err)
 	}
 	tests := []struct {
-		name   string
-		config *ServerConfig
+		name    string
+		options []Option
 	}{
-		{name: "no config"},
 		{
 			name: "basic config",
-			config: &ServerConfig{
-				Hostname: tsURL.Hostname(),
-				Port:     tsURL.Port(),
+			options: []Option{
+				WithHostname(tsURL.Hostname()),
+				WithPort(tsURL.Port()),
 			},
 		},
 	}
 	for _, test := range tests {
-		_, err = StartServer(path, test.config)
+		s, err := NewServer(path, test.options...)
 		if err != nil {
-			t.Errorf("StatServer error: %v", err)
+			t.Errorf("NewServer(%s) got error: %v", test.name, err)
+		}
+		err = s.Start()
+		if err != nil {
+			t.Errorf("Start(%s) got error: %v", test.name, err)
+		}
+		if err := s.Close(); err != nil {
+			t.Errorf("error closing test server: %v", err)
 		}
 	}
 }
@@ -85,7 +120,7 @@ func bouncyServer(bounce int) *httptest.Server {
 
 }
 
-func TestStartServerError(t *testing.T) {
+func TestStartError(t *testing.T) {
 	path, err := os.Executable()
 	if err != nil {
 		t.Skip("cannot find current test executable")
@@ -97,35 +132,29 @@ func TestStartServerError(t *testing.T) {
 		t.Fatalf("error creating test server: %v", err)
 	}
 	tests := []struct {
-		name   string
-		jar    string
-		config *ServerConfig
+		name    string
+		jar     string
+		options []Option
 	}{
-		{name: "no jar path"},
-		{
-			name: "invalid jar path",
-			jar:  "/invalid/jar/path.jar",
-		},
-		{
-			name: "invalid hostname",
-			jar:  path,
-			config: &ServerConfig{
-				Hostname: "192.168.0.%31",
-			},
-		},
 		{
 			name: "unresponsive server",
 			jar:  path,
-			config: &ServerConfig{
-				Hostname: tsURL.Hostname(),
-				Port:     tsURL.Port(),
-				Timeout:  2 * time.Second,
+			options: []Option{
+				WithHostname(tsURL.Hostname()),
+				WithPort(tsURL.Port()),
+				WithTimeout(2 * time.Second),
 			},
 		},
 	}
 	for _, test := range tests {
-		if _, err := StartServer(test.jar, test.config); err == nil {
-			t.Errorf("StartServer(%s) got no error, want error", test.name)
+		s, err := NewServer(test.jar, test.options...)
+		if err != nil {
+			t.Errorf("NewServer(%s) got error: %v", test.name, err)
+			continue
+		}
+		if err := s.Start(); err == nil {
+			t.Errorf("s.Start(%s) got no error, want error", test.name)
+			s.Close()
 		}
 	}
 }

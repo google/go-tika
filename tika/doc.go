@@ -24,7 +24,9 @@ Start with basic imports:
 		"github.com/google/go-tika/tika"
 	)
 
-If you don't have a downloaded Tika Server JAR, you can download one.
+You will need a running Server to make API calls to. So, if you don't
+have a server that is already running and you don't have the Server
+JAR already downloaded, you can download one.
 
 	err := tika.DownloadServer("1.14", "tika-server-1.14.jar")
 	if err != nil {
@@ -33,15 +35,19 @@ If you don't have a downloaded Tika Server JAR, you can download one.
 
 If you don't have a running Tika Server, you can start one.
 
-	s, err := tika.StartServer("tika-server-1.14.jar", nil)
+	s, err := tika.NewServer("tika-server-1.14.jar")
 	if err != nil {
+		log.Fatal(err)
+	}
+	if err := s.Start(); err != nil {
 		log.Fatal(err)
 	}
 	defer s.Close()
 
-Pass a *tika.ServerConfig to control the Server's behavior.
+Pass tika.Options to control the Server's behavior.
 
-Open any io.Reader.
+To parse the contents of a file (or any io.Reader), you will need to open the io.Reader,
+create a client, and call client.Parse.
 
 	f, err := os.Open("path/to/file")
 	if err != nil {
@@ -49,18 +55,13 @@ Open any io.Reader.
 	}
 	defer f.Close()
 
-Create a client and parse the io.Reader.
-
 	client := tika.NewClient(nil, s.URL())
 	body, err := client.Parse(f)
 
 If you pass an *http.Client to tika.NewClient, it will be used for all requests.
 
 Some functions return a custom type, like a Parsers(), Detectors(), and
-MimeTypes():
-
-	parsers, err := client.Parsers()
-	detectors, err := client.Detectors()
-	mimeTypes, err := client.MimeTypes()
+MimeTypes(). Use these to see what features are supported by the current
+server.
 */
 package tika

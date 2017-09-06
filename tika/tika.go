@@ -103,7 +103,7 @@ func (c *Client) call(input io.Reader, method, path string, header http.Header) 
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("response code %v", resp.StatusCode)
 	}
 

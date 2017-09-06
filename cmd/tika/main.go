@@ -86,11 +86,20 @@ func main() {
 	url := *serverURL
 
 	if *serverJAR != "" {
-		s, err := tika.StartServer(*serverJAR, nil)
+		s, err := tika.NewServer(*serverJAR)
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer s.Close()
+		err = s.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer func() {
+			if err := s.Close(); err != nil {
+				fmt.Printf("Error closing server: %v\n", err)
+			}
+		}()
+
 		url = s.URL()
 	}
 
