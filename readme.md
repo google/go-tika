@@ -4,65 +4,6 @@ go-tika is a Go client library and command line utility for accessing the [Apach
 
 go-tika requires Go version 1.7 or greater.
 
-## Usage
-Package `tika` provides a client and server for downloading, starting, and using the [Apache Tika](http://tika.apache.org) Server API.
-
-Start with basic imports:
-
-```go
-import (
-	"os"
-
-	"github.com/google/go-tika/tika"
-)
-```
-
-If you don't have a downloaded Tika Server JAR, you can download one:
-
-```go
-err := tika.DownloadServer("1.14", "tika-server-1.14.jar")
-if err != nil {
-	log.Fatal(err)
-}
-```
-
-If you don't have a running Tika Server, you can start one:
-
-```go
-s, err := tika.StartServer("tika-server-1.14.jar", nil)
-if err != nil {
-	log.Fatal(err)
-}
-defer s.Close()
-```
-
-Open any io.Reader:
-
-```go
-f, err := os.Open("path/to/file")
-if err != nil {
-	log.Fatal(err)
-}
-defer f.Close()
-```
-
-Create a client and parse the io.Reader:
-
-```go
-client := tika.NewClient(nil, s.URL())
-body, err := client.Parse(f)
-```
-
-If you pass an `*http.Client` to `tika.NewClient`, it will be used for all requests.
-
-Some functions return a custom type, like a `Parsers()`, `Detectors()`, and `MimeTypes()`:
-
-```go
-parsers, err := client.Parsers()
-detectors, err := client.Detectors()
-mimeTypes, err := client.MimeTypes()
-```
-
 See [the godoc](https://godoc.org/github.com/google/go-tika/tika) for more documentation on what resources are available.
 
 ## Command line client
