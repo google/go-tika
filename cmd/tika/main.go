@@ -28,7 +28,7 @@ import (
 )
 
 func usage() {
-	fmt.Printf("Usage: %s action [OPTIONS]\n\n", os.Args[0])
+	fmt.Printf("Usage: %s [OPTIONS] action\n\n", os.Args[0])
 	fmt.Printf("Valid actions: parse, detect, language, meta, version, parsers, mimetypes, detectors\n\n")
 	fmt.Println("Options:")
 	flag.PrintDefaults()
