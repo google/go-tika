@@ -286,7 +286,7 @@ func TestValidateFileMD5(t *testing.T) {
 
 func TestDownloadServerError(t *testing.T) {
 	tests := []struct {
-		version string
+		version Version
 		path    string
 	}{
 		{"1.0", ""},

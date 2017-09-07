@@ -177,12 +177,20 @@ func validateFileMD5(path, wantH string) bool {
 	return fmt.Sprintf("%x", h.Sum(nil)) == wantH
 }
 
+// A Version represents a Tika Server version.
+type Version string
+
+// Supported versions of Tika Server.
+const (
+	Version114 Version = "1.14"
+)
+
 // DownloadServer downloads and validates the given server version,
 // saving it at path. DownloadServer returns an error if it could
 // not be downloaded/validated. Valid values for the version are 1.14.
-func DownloadServer(ctx context.Context, version, path string) error {
-	md5s := map[string]string{
-		"1.14": "39055fc71358d774b9da066f80b1141c",
+func DownloadServer(ctx context.Context, version Version, path string) error {
+	md5s := map[Version]string{
+		Version114: "39055fc71358d774b9da066f80b1141c",
 	}
 	wantH := md5s[version]
 	if wantH == "" {
@@ -200,7 +208,7 @@ func DownloadServer(ctx context.Context, version, path string) error {
 	}
 	defer out.Close()
 
-	url := "http://search.maven.org/remotecontent?filepath=org/apache/tika/tika-server/" + version + "/tika-server-" + version + ".jar"
+	url := fmt.Sprintf("http://search.maven.org/remotecontent?filepath=org/apache/tika/tika-server/%s/tika-server-%s.jar", version, version)
 	resp, err := ctxhttp.Get(ctx, nil, url)
 	if err != nil {
 		return fmt.Errorf("unable to download %q: %v", url, err)
