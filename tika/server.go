@@ -50,17 +50,17 @@ func (s *Server) URL() string {
 	return s.url
 }
 
-// A Option can be passed to NewServer to configure the Server.
+// An Option can be passed to NewServer to configure the Server.
 type Option func(*Server)
 
-// WithHostname returns a Option to set the host of the Server.
+// WithHostname returns an Option to set the host of the Server.
 func WithHostname(h string) Option {
 	return func(s *Server) {
 		s.hostname = h
 	}
 }
 
-// WithPort returns a Option to set the port of the Server.
+// WithPort returns an Option to set the port of the Server.
 func WithPort(p string) Option {
 	return func(s *Server) {
 		s.port = p
