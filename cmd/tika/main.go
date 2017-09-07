@@ -74,7 +74,7 @@ func main() {
 		if *serverJAR == "" {
 			*serverJAR = "tika-server-" + *downloadVersion + ".jar"
 		}
-		err := tika.DownloadServer(context.Background(), *downloadVersion, *serverJAR)
+		err := tika.DownloadServer(context.Background(), tika.Version(*downloadVersion), *serverJAR)
 		if err != nil {
 			log.Fatal(err)
 		}
