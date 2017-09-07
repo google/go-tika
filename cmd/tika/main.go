@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -73,7 +74,7 @@ func main() {
 		if *serverJAR == "" {
 			*serverJAR = "tika-server-" + *downloadVersion + ".jar"
 		}
-		err := tika.DownloadServer(*downloadVersion, *serverJAR)
+		err := tika.DownloadServer(context.Background(), *downloadVersion, *serverJAR)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -127,40 +128,40 @@ func main() {
 		log.Fatalf("error: invalid action %q", action)
 	case parse:
 		if *recursive {
-			body, err = c.ParseRecursive(file)
+			body, err = c.ParseRecursive(context.Background(), file)
 		} else {
-			body, err = c.Parse(file)
+			body, err = c.Parse(context.Background(), file)
 		}
 	case detect:
-		body, err = c.Detect(file)
+		body, err = c.Detect(context.Background(), file)
 	case language:
-		body, err = c.Language(file)
+		body, err = c.Language(context.Background(), file)
 	case meta:
 		if *metaField != "" {
-			body, err = c.MetaField(file, *metaField)
+			body, err = c.MetaField(context.Background(), file, *metaField)
 		} else if *recursive {
-			body, err = c.MetaRecursive(file)
+			body, err = c.MetaRecursive(context.Background(), file)
 		} else {
-			body, err = c.Meta(file)
+			body, err = c.Meta(context.Background(), file)
 		}
 	case version:
-		body, err = c.Version()
+		body, err = c.Version(context.Background())
 	case parsers:
-		body, err = c.Parsers()
+		body, err = c.Parsers(context.Background())
 		if err != nil {
 			log.Fatalf("tika %v error: %v", action, err)
 		}
 		body, err = json.MarshalIndent(body, "", "  ")
 		body = string(body.([]byte))
 	case mimeTypes:
-		body, err = c.MimeTypes()
+		body, err = c.MimeTypes(context.Background())
 		if err != nil {
 			log.Fatalf("tika %v error: %v", action, err)
 		}
 		body, err = json.MarshalIndent(body, "", "  ")
 		body = string(body.([]byte))
 	case detectors:
-		body, err = c.Detectors()
+		body, err = c.Detectors(context.Background())
 		if err != nil {
 			log.Fatalf("tika %v error: %v\n", action, err)
 		}

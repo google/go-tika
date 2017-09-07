@@ -18,15 +18,17 @@ package tika
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"time"
+
+	"golang.org/x/net/context/ctxhttp"
 )
 
 // Server represents a Tika server. Create a new Server with NewServer,
@@ -138,7 +140,7 @@ func (s Server) waitForStart() error {
 	c := NewClient(nil, s.url)
 	var err error
 	for i := time.Duration(0); i < s.timeout; i += time.Second {
-		if _, err = c.Version(); err == nil {
+		if _, err = c.Version(context.Background()); err == nil {
 			return nil
 		}
 		time.Sleep(time.Second)
@@ -178,7 +180,7 @@ func validateFileMD5(path, wantH string) bool {
 // DownloadServer downloads and validates the given server version,
 // saving it at path. DownloadServer returns an error if it could
 // not be downloaded/validated. Valid values for the version are 1.14.
-func DownloadServer(version, path string) error {
+func DownloadServer(ctx context.Context, version, path string) error {
 	md5s := map[string]string{
 		"1.14": "39055fc71358d774b9da066f80b1141c",
 	}
@@ -199,7 +201,7 @@ func DownloadServer(version, path string) error {
 	defer out.Close()
 
 	url := "http://search.maven.org/remotecontent?filepath=org/apache/tika/tika-server/" + version + "/tika-server-" + version + ".jar"
-	resp, err := http.Get(url)
+	resp, err := ctxhttp.Get(ctx, nil, url)
 	if err != nil {
 		return fmt.Errorf("unable to download %q: %v", url, err)
 	}

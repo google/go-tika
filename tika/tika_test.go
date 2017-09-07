@@ -17,6 +17,7 @@ limitations under the License.
 package tika
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -48,7 +49,7 @@ func TestCallError(t *testing.T) {
 	}
 	for _, test := range tests {
 		c := NewClient(nil, test.url)
-		if _, err := c.call(nil, test.method, "", nil); err == nil {
+		if _, err := c.call(context.Background(), nil, test.method, "", nil); err == nil {
 			t.Errorf("call(%s, %s) got no error, want error", test.method, test.url)
 		}
 
@@ -62,7 +63,7 @@ func TestParse(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Parse(nil)
+	got, err := c.Parse(context.Background(), nil)
 	if err != nil {
 		t.Errorf("Parse returned nil, want %q", want)
 	}
@@ -98,7 +99,7 @@ func TestParseRecursive(t *testing.T) {
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		got, err := c.ParseRecursive(nil)
+		got, err := c.ParseRecursive(context.Background(), nil)
 		if err != nil {
 			t.Errorf("ParseRecursive returned an error: %v, want %v", err, test.want)
 		}
@@ -109,7 +110,7 @@ func TestParseRecursive(t *testing.T) {
 }
 
 func TestParseRecursiveError(t *testing.T) {
-	_, err := errorClient.ParseRecursive(nil)
+	_, err := errorClient.ParseRecursive(context.Background(), nil)
 	if err == nil {
 		t.Error("ParseRecursive got no error, want an error")
 	}
@@ -122,7 +123,7 @@ func TestMeta(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Meta(nil)
+	got, err := c.Meta(context.Background(), nil)
 	if err != nil {
 		t.Errorf("Meta returned an error: %v, want %q", err, want)
 	}
@@ -138,7 +139,7 @@ func TestMetaField(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.MetaField(nil, "")
+	got, err := c.MetaField(context.Background(), nil, "")
 	if err != nil {
 		t.Errorf("MetaField returned an error: %v, want %q", err, want)
 	}
@@ -154,7 +155,7 @@ func TestDetect(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Detect(nil)
+	got, err := c.Detect(context.Background(), nil)
 	if err != nil {
 		t.Errorf("Detect returned an error: %v, want %q", err, want)
 	}
@@ -170,7 +171,7 @@ func TestLanguage(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Language(nil)
+	got, err := c.Language(context.Background(), nil)
 	if err != nil {
 		t.Errorf("Language returned an error: %v, want %q", err, want)
 	}
@@ -186,7 +187,7 @@ func TestLanguageString(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.LanguageString("")
+	got, err := c.LanguageString(context.Background(), "")
 	if err != nil {
 		t.Errorf("LanguageString returned an error: %v, want %q", err, want)
 	}
@@ -248,7 +249,7 @@ func TestMetaRecursive(t *testing.T) {
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		got, err := c.MetaRecursive(nil)
+		got, err := c.MetaRecursive(context.Background(), nil)
 		if err != nil {
 			t.Errorf("MetaRecursive returned an error: %v, want %v", err, test.want)
 		}
@@ -277,7 +278,7 @@ func TestMetaRecursiveError(t *testing.T) {
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		_, err := c.MetaRecursive(nil)
+		_, err := c.MetaRecursive(context.Background(), nil)
 		if err == nil {
 			t.Errorf("MetaRecursive(%s) got no error, want an error", test.name)
 		}
@@ -291,7 +292,7 @@ func TestTranslate(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Translate(nil, "translator", "src", "dst")
+	got, err := c.Translate(context.Background(), nil, "translator", "src", "dst")
 	if err != nil {
 		t.Errorf("Translate returned an error: %v, want %q", err, want)
 	}
@@ -365,7 +366,7 @@ func TestParsers(t *testing.T) {
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		got, err := c.Parsers()
+		got, err := c.Parsers(context.Background())
 		if err != nil {
 			t.Errorf("Parsers returned an error: %v, want %+v", err, test.want)
 		}
@@ -390,12 +391,12 @@ func TestParsersError(t *testing.T) {
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		_, err := c.Parsers()
+		_, err := c.Parsers(context.Background())
 		if err == nil {
 			t.Errorf("Parsers(%q) got no error, want an error", test.response)
 		}
 	}
-	if _, err := errorClient.Parsers(); err == nil {
+	if _, err := errorClient.Parsers(context.Background()); err == nil {
 		t.Errorf("Parsers got no error, want an error")
 	}
 }
@@ -407,7 +408,7 @@ func TestVersion(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Version()
+	got, err := c.Version(context.Background())
 	if err != nil {
 		t.Errorf("Version returned an error: %v, want %q", err, want)
 	}
@@ -458,7 +459,7 @@ func TestMimeTypes(t *testing.T) {
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		got, err := c.MimeTypes()
+		got, err := c.MimeTypes(context.Background())
 		if err != nil {
 			t.Errorf("MimeTypes returned an error: %v, want %q", err, test.want)
 		}
@@ -485,12 +486,12 @@ func TestMimeTypesError(t *testing.T) {
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		_, err := c.MimeTypes()
+		_, err := c.MimeTypes(context.Background())
 		if err == nil {
 			t.Errorf("MimeTypes got no error, want an error")
 		}
 	}
-	if _, err := errorClient.MimeTypes(); err == nil {
+	if _, err := errorClient.MimeTypes(context.Background()); err == nil {
 		t.Errorf("MimeTypes got no error, want an error")
 	}
 }
@@ -501,7 +502,7 @@ func TestMetaRecursive_BadResponse(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.MetaRecursive(nil)
+	got, err := c.MetaRecursive(context.Background(), nil)
 	if err == nil {
 		t.Errorf("MetaRecursive got %q, want an error", got)
 	}
@@ -513,7 +514,7 @@ func TestMetaRecursive_BadFieldType(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.MetaRecursive(nil)
+	got, err := c.MetaRecursive(context.Background(), nil)
 	if err == nil {
 		t.Errorf("MetaRecursive got %q, want an error", got)
 	}
@@ -577,7 +578,7 @@ func TestDetectors(t *testing.T) {
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		got, err := c.Detectors()
+		got, err := c.Detectors(context.Background())
 		if err != nil {
 			t.Errorf("Detectors returned an error: %v, want %+v", err, test.want)
 		}
@@ -604,12 +605,12 @@ func TestDetectorsError(t *testing.T) {
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		_, err := c.Detectors()
+		_, err := c.Detectors(context.Background())
 		if err == nil {
 			t.Errorf("Detectors got no error, want an error")
 		}
 	}
-	if _, err := errorClient.Detectors(); err == nil {
+	if _, err := errorClient.Detectors(context.Background()); err == nil {
 		t.Errorf("Detectors got no error, want an error")
 	}
 }
