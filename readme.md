@@ -19,7 +19,7 @@ go get github.com/google/go-tika/cmd/tika
 To download the Apache Tika 1.14 Server, check the MD5 sum, start the server in the background, and parse a file, run:
 
 ```bash
-$GOPATH/bin/tika -action parse -filename /path/to/file -downloadVersion 1.14
+$GOPATH/bin/tika -filename /path/to/file -downloadVersion 1.14 parse
 ```
 
 This will store tika-server-1.14.jar in your current working directory. If you want to control the output location of the JAR, add a `-serverJAR /path/to/save/tika-server.jar` argument.
