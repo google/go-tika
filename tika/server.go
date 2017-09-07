@@ -67,9 +67,9 @@ func WithPort(p string) Option {
 	}
 }
 
-// WithTimeout returns a Option to set the timeout for how long to wait
+// WithStartupTimeout returns an Option to set the timeout for how long to wait
 // for the Server to start.
-func WithTimeout(d time.Duration) Option {
+func WithStartupTimeout(d time.Duration) Option {
 	return func(s *Server) {
 		s.timeout = d
 	}

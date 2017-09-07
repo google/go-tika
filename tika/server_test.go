@@ -17,6 +17,7 @@ limitations under the License.
 package tika
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -142,7 +143,7 @@ func TestStartError(t *testing.T) {
 			options: []Option{
 				WithHostname(tsURL.Hostname()),
 				WithPort(tsURL.Port()),
-				WithTimeout(2 * time.Second),
+				WithStartupTimeout(2 * time.Second),
 			},
 		},
 	}
@@ -291,7 +292,7 @@ func TestDownloadServerError(t *testing.T) {
 		{"1.0", ""},
 	}
 	for _, test := range tests {
-		if err := DownloadServer(test.version, test.path); err == nil {
+		if err := DownloadServer(context.Background(), test.version, test.path); err == nil {
 			t.Errorf("DownloadServer(%s, %s) got no error, want an error", test.version, test.path)
 		}
 	}
