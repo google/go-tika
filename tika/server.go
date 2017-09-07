@@ -188,6 +188,7 @@ const (
 // DownloadServer downloads and validates the given server version,
 // saving it at path. DownloadServer returns an error if it could
 // not be downloaded/validated. Valid values for the version are 1.14.
+// It is the callers responsibility to remove the file when no longer needed.
 func DownloadServer(ctx context.Context, version Version, path string) error {
 	md5s := map[Version]string{
 		Version114: "39055fc71358d774b9da066f80b1141c",

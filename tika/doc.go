@@ -22,7 +22,8 @@ Start with basic imports:
 
 You will need a running Server to make API calls to. So, if you don't
 have a server that is already running and you don't have the Server
-JAR already downloaded, you can download one.
+JAR already downloaded, you can download one. The caller is responsible
+for removing the file when no longer needed.
 
 	err := tika.DownloadServer(context.Background(), "1.14", "tika-server-1.14.jar")
 	if err != nil {
