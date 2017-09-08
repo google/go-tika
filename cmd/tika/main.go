@@ -29,9 +29,9 @@ import (
 )
 
 func usage() {
-	fmt.Printf("Usage: %s [OPTIONS] action\n\n", os.Args[0])
-	fmt.Printf("Valid actions: parse, detect, language, meta, version, parsers, mimetypes, detectors\n\n")
-	fmt.Println("Options:")
+	fmt.Printf("Usage: %s [OPTIONS] ACTION\n\n", os.Args[0])
+	fmt.Printf("ACTIONS: parse, detect, language, meta, version, parsers, mimetypes, detectors\n\n")
+	fmt.Println("OPTIONS:")
 	flag.PrintDefaults()
 }
 
@@ -53,12 +53,12 @@ const (
 
 // Command line flags.
 var (
-	downloadVersion = flag.String("downloadVersion", "", "Tika Server JAR version to download. If -serverJAR is specified, it will be downloaded to that location, otherwise it will be downloaded to your working directory. If the JAR has already been downloaded and has the correct MD5, this will do nothing. Valid versions: 1.14.")
+	downloadVersion = flag.String("download_version", "", "Tika Server JAR version to download. If -serverJAR is specified, it will be downloaded to that location, otherwise it will be downloaded to your working directory. If the JAR has already been downloaded and has the correct MD5, this will do nothing. Valid versions: 1.14.")
 	filename        = flag.String("filename", "", "Path to file to parse.")
 	metaField       = flag.String("field", "", `Specific field to get when using the "meta" action. Undefined when using the -recursive flag.`)
 	recursive       = flag.Bool("recursive", false, `Whether to run "parse" or "meta" recursively, returning a list with one element per embedded document. Undefined when using the -field flag.`)
-	serverJAR       = flag.String("serverJAR", "", "Absolute path to the Tika Server JAR. This will start a new server, ignoring -serverURL.")
-	serverURL       = flag.String("serverURL", "", "URL of Tika server.")
+	serverJAR       = flag.String("server_jar", "", "Absolute path to the Tika Server JAR. This will start a new server, ignoring -serverURL.")
+	serverURL       = flag.String("server_url", "", "URL of Tika server.")
 )
 
 func main() {
