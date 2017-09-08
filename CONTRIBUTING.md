@@ -6,7 +6,7 @@ just a few small guidelines you need to follow.
 ## Contributor License Agreement
 
 Contributions to this project must be accompanied by a Contributor License
-Agreement. You (or your employer) retain the copyright to your contribution,
+Agreement (CLA). You (or your employer) retain the copyright to your contribution,
 this simply gives us permission to use and redistribute your contributions as
 part of the project. Head over to <https://cla.developers.google.com/> to see
 your current agreements on file or to sign a new one.
@@ -30,7 +30,7 @@ again.
      commits related to that bug or feature.
 
   1. Go makes it very simple to ensure properly formatted code, so always run
-     `go fmt` on your code before committing it. You should also run
+     `gofmt` on your code before committing it. You should also run
      [golint][] over your code. As noted in the [golint readme][], it's not
      strictly necessary that your code be completely "lint-free", but this will
      help you find common style issues.
