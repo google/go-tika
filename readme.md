@@ -13,13 +13,13 @@ The `tika` binary allows you to access the Apache Tika Server API from the comma
 To get the binary, run:
 
 ```bash
-go get github.com/google/go-tika/cmd/tika
+go get -u github.com/google/go-tika/cmd/tika
 ```
 
 To download the Apache Tika 1.14 Server, check the MD5 sum, start the server in the background, and parse a file, run:
 
 ```bash
-$GOPATH/bin/tika -filename /path/to/file -downloard_version 1.14 parse
+$GOPATH/bin/tika -filename /path/to/file/to/parse -download_version 1.14 parse
 ```
 
 This will store tika-server-1.14.jar in your current working directory. If you want to control the output location of the JAR, add a `-server_jar /path/to/save/tika-server.jar` argument.
