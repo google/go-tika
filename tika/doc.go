@@ -36,10 +36,11 @@ If you don't have a running Tika Server, you can start one.
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := s.Start(); err != nil {
+	cancel, err := s.Start()
+	if err != nil {
 		log.Fatal(err)
 	}
-	defer s.Close()
+	defer cancel()
 
 Pass tika.Options to NewServer control the Server's behavior.
 
@@ -58,8 +59,8 @@ create a client, and call client.Parse.
 
 If you pass an *http.Client to tika.NewClient, it will be used for all requests.
 
-Some functions return a custom type, like a Parsers(), Detectors(), and
-MimeTypes(). Use these to see what features are supported by the current
+Some functions return a custom type, like Parsers(), Detectors(), and
+MIMETypes(). Use these to see what features are supported by the current
 Tika server.
 */
 package tika

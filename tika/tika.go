@@ -55,9 +55,9 @@ type Parser struct {
 	SupportedTypes []string
 }
 
-// MimeType represents a Tika Mime Type. To get a list of all MimeTypes, see
+// MIMEType represents a Tika Mime Type. To get a list of all MimeTypes, see
 // MimeTypes.
-type MimeType struct {
+type MIMEType struct {
 	Alias     []string
 	SuperType string
 }
@@ -89,7 +89,7 @@ const (
 const XTIKAContent = "X-TIKA:content"
 
 // call makes the given request to c and returns the result as a []byte and
-// error. call returns an error if the response code is not 2xx.
+// error. call returns an error if the response code is not 200 StatusOK.
 func (c *Client) call(ctx context.Context, input io.Reader, method, path string, header http.Header) ([]byte, error) {
 	if c.httpClient == nil {
 		c.httpClient = http.DefaultClient
@@ -109,12 +109,11 @@ func (c *Client) call(ctx context.Context, input io.Reader, method, path string,
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("response code %v", resp.StatusCode)
 	}
-
 	return ioutil.ReadAll(resp.Body)
 }
 
 // callString makes the given request to c and returns the result as a string
-// and error. callString returns an error if the response code is not 2xx.
+// and error. callString returns an error if the response code is not 200 StatusOK.
 func (c *Client) callString(ctx context.Context, input io.Reader, method, path string, header http.Header) (string, error) {
 	body, err := c.call(ctx, input, method, path, header)
 	if err != nil {
@@ -191,8 +190,7 @@ func (c *Client) MetaRecursive(ctx context.Context, input io.Reader) ([]map[stri
 		return nil, err
 	}
 	var m []map[string]interface{}
-	err = json.Unmarshal(body, &m)
-	if err != nil {
+	if err = json.Unmarshal(body, &m); err != nil {
 		return nil, err
 	}
 	var r []map[string][]string
@@ -200,18 +198,16 @@ func (c *Client) MetaRecursive(ctx context.Context, input io.Reader) ([]map[stri
 		doc := make(map[string][]string)
 		r = append(r, doc)
 		for k, v := range d {
-			switch v.(type) {
+			switch vt := v.(type) {
 			case string:
-				doc[k] = []string{v.(string)}
+				doc[k] = []string{vt}
 			case []interface{}:
-				doc[k] = []string{}
-				for _, i := range v.([]interface{}) {
-					switch i.(type) {
-					case string:
-						doc[k] = append(doc[k], i.(string))
-					default:
-						return nil, fmt.Errorf("field %q has value %v and type %v, expected a string or []string", k, v, reflect.TypeOf(v))
+				for _, i := range vt {
+					s, ok := i.(string)
+					if !ok {
+						return nil, fmt.Errorf("field %q has value %v and type %T, expected a string or []string", k, v, vt)
 					}
+					doc[k] = append(doc[k], s)
 				}
 			default:
 				return nil, fmt.Errorf("field %q has value %v and type %v, expected a string or []string", k, v, reflect.TypeOf(v))
@@ -227,46 +223,49 @@ func (c *Client) Translate(ctx context.Context, input io.Reader, t Translator, s
 	return c.callString(ctx, input, "POST", fmt.Sprintf("/translate/all/%s/%s/%s", t, src, dst), nil)
 }
 
-var jsonHeader = http.Header{"Accept": []string{"application/json"}}
-
-// Parsers returns the list of available parsers and an error. If the error is
-// not nil, the list is undefined. To get all available parsers, iterate through
-// the Children of every Parser.
-func (c *Client) Parsers(ctx context.Context) (*Parser, error) {
-	body, err := c.call(ctx, nil, "GET", "/parsers/details", jsonHeader)
-	if err != nil {
-		return nil, err
-	}
-	var parsers Parser
-	err = json.Unmarshal(body, &parsers)
-	return &parsers, err
-}
-
 // Version returns the default hello message from Tika server.
 func (c *Client) Version(ctx context.Context) (string, error) {
 	return c.callString(ctx, nil, "GET", "/version", nil)
 }
 
-// MimeTypes returns a map from Mime Type name to MimeType, or properties about
-// that specific Mime Type.
-func (c *Client) MimeTypes(ctx context.Context) (map[string]MimeType, error) {
-	body, err := c.call(ctx, nil, "GET", "/mime-types", jsonHeader)
+var jsonHeader = http.Header{"Accept": []string{"application/json"}}
+
+// callUnmarshal is like call, but unmarshals the JSON response into v.
+func (c *Client) callUnmarshal(ctx context.Context, method, path string, header http.Header, v interface{}) error {
+	body, err := c.call(ctx, nil, method, path, header)
 	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, v)
+}
+
+// Parsers returns the list of available parsers and an error. If the error is
+// not nil, the list is undefined. To get all available parsers, iterate through
+// the Children of every Parser.
+func (c *Client) Parsers(ctx context.Context) (*Parser, error) {
+	p := new(Parser)
+	if err := c.callUnmarshal(ctx, "GET", "/parsers/details", jsonHeader, p); err != nil {
 		return nil, err
 	}
-	var mt map[string]MimeType
-	err = json.Unmarshal(body, &mt)
-	return mt, err
+	return p, nil
+}
+
+// MIMETypes returns a map from MIME Type name to MIMEType, or properties about
+// that specific MIMEType.
+func (c *Client) MIMETypes(ctx context.Context) (map[string]MIMEType, error) {
+	mt := new(map[string]MIMEType)
+	if err := c.callUnmarshal(ctx, "GET", "/mime-types", jsonHeader, mt); err != nil {
+		return nil, err
+	}
+	return *mt, nil
 }
 
 // Detectors returns the list of available Detectors for this server. To get all
 // available detectors, iterate through the Children of every Detector.
 func (c *Client) Detectors(ctx context.Context) (*Detector, error) {
-	body, err := c.call(ctx, nil, "GET", "/detectors", jsonHeader)
-	if err != nil {
+	d := new(Detector)
+	if err := c.callUnmarshal(ctx, "GET", "/detectors", jsonHeader, d); err != nil {
 		return nil, err
 	}
-	var d Detector
-	err = json.Unmarshal(body, &d)
-	return &d, err
+	return d, nil
 }

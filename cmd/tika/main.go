@@ -24,6 +24,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/google/go-tika/tika"
 )
@@ -84,27 +85,22 @@ func main() {
 		log.Fatal("no URL specified: set serverURL, serverJAR and/or downloadVersion")
 	}
 
-	url := *serverURL
-
 	if *serverJAR != "" {
 		s, err := tika.NewServer(*serverJAR)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = s.Start()
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer func() {
-			if err := s.Close(); err != nil {
-				fmt.Printf("Error closing server: %v\n", err)
-			}
-		}()
 
-		url = s.URL()
+		cancel, err := s.Start(context.Background())
+		if err != nil {
+			log.Fatalf("could not start server: %v", err)
+		}
+		defer cancel()
+
+		*serverURL = s.URL()
 	}
 
-	var body interface{}
+	var body string
 	var file io.Reader
 	var err error
 
@@ -120,7 +116,7 @@ func main() {
 		}
 	}
 
-	c := tika.NewClient(nil, url)
+	c := tika.NewClient(nil, *serverURL)
 
 	switch action {
 	default:
@@ -128,7 +124,9 @@ func main() {
 		log.Fatalf("error: invalid action %q", action)
 	case parse:
 		if *recursive {
-			body, err = c.ParseRecursive(context.Background(), file)
+			var bs []string
+			bs, err = c.ParseRecursive(context.Background(), file)
+			body = strings.Join(bs, "\n")
 		} else {
 			body, err = c.Parse(context.Background(), file)
 		}
@@ -140,33 +138,55 @@ func main() {
 		if *metaField != "" {
 			body, err = c.MetaField(context.Background(), file, *metaField)
 		} else if *recursive {
-			body, err = c.MetaRecursive(context.Background(), file)
+			var mr []map[string][]string
+			mr, err = c.MetaRecursive(context.Background(), file)
+			var bytes []byte
+			bytes, err = json.MarshalIndent(mr, "", "  ")
+			if err != nil {
+				log.Fatalf("json marshal error: %v", err)
+			}
+			body = string(bytes)
 		} else {
 			body, err = c.Meta(context.Background(), file)
 		}
 	case version:
 		body, err = c.Version(context.Background())
 	case parsers:
-		body, err = c.Parsers(context.Background())
+		var p *tika.Parser
+		p, err = c.Parsers(context.Background())
 		if err != nil {
 			log.Fatalf("tika %v error: %v", action, err)
 		}
-		body, err = json.MarshalIndent(body, "", "  ")
-		body = string(body.([]byte))
+		var bytes []byte
+		bytes, err = json.MarshalIndent(p, "", "  ")
+		if err != nil {
+			log.Fatalf("json marshal error: %v", err)
+		}
+		body = string(bytes)
 	case mimeTypes:
-		body, err = c.MimeTypes(context.Background())
+		var mt map[string]tika.MIMEType
+		mt, err = c.MIMETypes(context.Background())
 		if err != nil {
 			log.Fatalf("tika %v error: %v", action, err)
 		}
-		body, err = json.MarshalIndent(body, "", "  ")
-		body = string(body.([]byte))
+		var bytes []byte
+		bytes, err = json.MarshalIndent(mt, "", "  ")
+		if err != nil {
+			log.Fatalf("json marshal error: %v", err)
+		}
+		body = string(bytes)
 	case detectors:
-		body, err = c.Detectors(context.Background())
+		var d *tika.Detector
+		d, err = c.Detectors(context.Background())
 		if err != nil {
 			log.Fatalf("tika %v error: %v\n", action, err)
 		}
-		body, err = json.MarshalIndent(body, "", "  ")
-		body = string(body.([]byte))
+		var bytes []byte
+		bytes, err = json.MarshalIndent(d, "", "  ")
+		if err != nil {
+			log.Fatalf("json marshal error: %v", err)
+		}
+		body = string(bytes)
 	}
 	if err != nil {
 		log.Fatalf("tika %q error: %v\n", action, err)

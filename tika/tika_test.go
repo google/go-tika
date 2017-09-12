@@ -26,8 +26,8 @@ import (
 	"testing"
 )
 
-// errorServer always response with http.StatusInternalServerError.
-var errorServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// errorServer always responds with http.StatusInternalServerError.
+var errorServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusInternalServerError)
 }))
 
@@ -45,12 +45,12 @@ func TestCallError(t *testing.T) {
 		url    string
 	}{
 		{"bad method", ""},
-		{"GET", "http://unknown_test_url"},
+		{"GET", "https://unknown_test_url"},
 	}
 	for _, test := range tests {
 		c := NewClient(nil, test.url)
 		if _, err := c.call(context.Background(), nil, test.method, "", nil); err == nil {
-			t.Errorf("call(%s, %s) got no error, want error", test.method, test.url)
+			t.Errorf("call(%q, %q) got no error, want error", test.method, test.url)
 		}
 
 	}
@@ -58,14 +58,14 @@ func TestCallError(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, want)
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
 	got, err := c.Parse(context.Background(), nil)
 	if err != nil {
-		t.Errorf("Parse returned nil, want %q", want)
+		t.Fatalf("Parse returned nil, want %q", want)
 	}
 	if got != want {
 		t.Errorf("Parse got %q, want %q", got, want)
@@ -94,7 +94,7 @@ func TestParseRecursive(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprint(w, test.response)
 		}))
 		defer ts.Close()
@@ -102,6 +102,7 @@ func TestParseRecursive(t *testing.T) {
 		got, err := c.ParseRecursive(context.Background(), nil)
 		if err != nil {
 			t.Errorf("ParseRecursive returned an error: %v, want %v", err, test.want)
+			continue
 		}
 		if !reflect.DeepEqual(got, test.want) {
 			t.Errorf("ParseRecursive(%q) got %v, want %v", test.response, got, test.want)
@@ -110,22 +111,21 @@ func TestParseRecursive(t *testing.T) {
 }
 
 func TestParseRecursiveError(t *testing.T) {
-	_, err := errorClient.ParseRecursive(context.Background(), nil)
-	if err == nil {
+	if _, err := errorClient.ParseRecursive(context.Background(), nil); err == nil {
 		t.Error("ParseRecursive got no error, want an error")
 	}
 }
 
 func TestMeta(t *testing.T) {
 	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, want)
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
 	got, err := c.Meta(context.Background(), nil)
 	if err != nil {
-		t.Errorf("Meta returned an error: %v, want %q", err, want)
+		t.Fatalf("Meta returned an error: %v, want %q", err, want)
 	}
 	if got != want {
 		t.Errorf("Meta got %q, want %q", got, want)
@@ -134,7 +134,7 @@ func TestMeta(t *testing.T) {
 
 func TestMetaField(t *testing.T) {
 	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, want)
 	}))
 	defer ts.Close()
@@ -150,7 +150,7 @@ func TestMetaField(t *testing.T) {
 
 func TestDetect(t *testing.T) {
 	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, want)
 	}))
 	defer ts.Close()
@@ -166,7 +166,7 @@ func TestDetect(t *testing.T) {
 
 func TestLanguage(t *testing.T) {
 	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, want)
 	}))
 	defer ts.Close()
@@ -182,7 +182,7 @@ func TestLanguage(t *testing.T) {
 
 func TestLanguageString(t *testing.T) {
 	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, want)
 	}))
 	defer ts.Close()
@@ -204,39 +204,27 @@ func TestMetaRecursive(t *testing.T) {
 		{
 			response: `[{"X-TIKA:content":"test 1"}]`,
 			want: []map[string][]string{
-				map[string][]string{
-					"X-TIKA:content": []string{"test 1"},
-				},
+				{"X-TIKA:content": {"test 1"}},
 			},
 		},
 		{
 			response: `[{"X-TIKA:content":"test 1"},{"X-TIKA:content":"test 2"}]`,
 			want: []map[string][]string{
-				map[string][]string{
-					"X-TIKA:content": []string{"test 1"},
-				},
-				map[string][]string{
-					"X-TIKA:content": []string{"test 2"},
-				},
+				{"X-TIKA:content": {"test 1"}},
+				{"X-TIKA:content": {"test 2"}},
 			},
 		},
 		{
 			response: `[{"other_key":"other_value"},{"X-TIKA:content":"test"}]`,
 			want: []map[string][]string{
-				map[string][]string{
-					"other_key": []string{"other_value"},
-				},
-				map[string][]string{
-					"X-TIKA:content": []string{"test"},
-				},
+				{"other_key": {"other_value"}},
+				{"X-TIKA:content": {"test"}},
 			},
 		},
 		{
 			response: `[{"other_key":["other_value", "other_value2"]}]`,
 			want: []map[string][]string{
-				map[string][]string{
-					"other_key": []string{"other_value", "other_value2"},
-				},
+				{"other_key": {"other_value", "other_value2"}},
 			},
 		},
 		{
@@ -244,7 +232,7 @@ func TestMetaRecursive(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprint(w, test.response)
 		}))
 		defer ts.Close()
@@ -273,7 +261,7 @@ func TestMetaRecursiveError(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprint(w, test.response)
 		}))
 		defer ts.Close()
@@ -287,7 +275,7 @@ func TestMetaRecursiveError(t *testing.T) {
 
 func TestTranslate(t *testing.T) {
 	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, want)
 	}))
 	defer ts.Close()
@@ -323,10 +311,10 @@ func TestParsers(t *testing.T) {
 			want: Parser{
 				Name: "TestParser",
 				Children: []Parser{
-					Parser{
+					{
 						Name: "TestSubParser1",
 					},
-					Parser{
+					{
 						Name: "TestSubParser2",
 					},
 				},
@@ -351,7 +339,7 @@ func TestParsers(t *testing.T) {
 				Composite:      true,
 				SupportedTypes: []string{"test-type"},
 				Children: []Parser{
-					Parser{
+					{
 						Name:           "TestSubParser",
 						Decorated:      true,
 						SupportedTypes: []string{"test-type-two"},
@@ -361,7 +349,7 @@ func TestParsers(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprint(w, test.response)
 		}))
 		defer ts.Close()
@@ -386,13 +374,12 @@ func TestParsersError(t *testing.T) {
 		{},
 	}
 	for _, test := range tests {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprint(w, test.response)
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		_, err := c.Parsers(context.Background())
-		if err == nil {
+		if _, err := c.Parsers(context.Background()); err == nil {
 			t.Errorf("Parsers(%q) got no error, want an error", test.response)
 		}
 	}
@@ -403,7 +390,7 @@ func TestParsersError(t *testing.T) {
 
 func TestVersion(t *testing.T) {
 	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, want)
 	}))
 	defer ts.Close()
@@ -417,36 +404,36 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-func TestMimeTypes(t *testing.T) {
+func TestMIMETypes(t *testing.T) {
 	tests := []struct {
 		response string
-		want     map[string]MimeType
+		want     map[string]MIMEType
 	}{
 		{
 			response: `{"empty-mime":{}}`,
-			want: map[string]MimeType{
-				"empty-mime": MimeType{},
+			want: map[string]MIMEType{
+				"empty-mime": {},
 			},
 		},
 		{
 			response: `{"alias-mime":{"alias":["alias1", "alias2"]}}`,
-			want: map[string]MimeType{
-				"alias-mime": MimeType{
+			want: map[string]MIMEType{
+				"alias-mime": {
 					Alias: []string{"alias1", "alias2"},
 				},
 			},
 		},
 		{
 			response: `{"empty-mime":{},"super-mime":{"supertype":"super-mime"}}`,
-			want: map[string]MimeType{
-				"empty-mime": MimeType{},
-				"super-mime": MimeType{SuperType: "super-mime"},
+			want: map[string]MIMEType{
+				"empty-mime": {},
+				"super-mime": {SuperType: "super-mime"},
 			},
 		},
 		{
 			response: `{"super-alias":{"alias":["alias1", "alias2"], "supertype": "super-mime"}}`,
-			want: map[string]MimeType{
-				"super-alias": MimeType{
+			want: map[string]MIMEType{
+				"super-alias": {
 					Alias:     []string{"alias1", "alias2"},
 					SuperType: "super-mime",
 				},
@@ -454,50 +441,46 @@ func TestMimeTypes(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprint(w, test.response)
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		got, err := c.MimeTypes(context.Background())
+		got, err := c.MIMETypes(context.Background())
 		if err != nil {
-			t.Errorf("MimeTypes returned an error: %v, want %q", err, test.want)
+			t.Errorf("MIMETypes returned an error: %v, want %q", err, test.want)
+			continue
 		}
 		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf("MimeTypes got %+v, want %+v", got, test.want)
+			t.Errorf("MIMETypes got %+v, want %+v", got, test.want)
 		}
 	}
 }
 
-func TestMimeTypesError(t *testing.T) {
+func TestMIMETypesError(t *testing.T) {
 	tests := []struct {
 		response string
 	}{
-		{
-			response: "",
-		},
-		{
-			response: `["test"]`,
-		},
+		{response: ""},
+		{response: `["test"]`},
 	}
 	for _, test := range tests {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprint(w, test.response)
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		_, err := c.MimeTypes(context.Background())
-		if err == nil {
-			t.Errorf("MimeTypes got no error, want an error")
+		if _, err := c.MIMETypes(context.Background()); err == nil {
+			t.Errorf("MIMETypes got no error, want an error")
 		}
 	}
-	if _, err := errorClient.MimeTypes(context.Background()); err == nil {
-		t.Errorf("MimeTypes got no error, want an error")
+	if _, err := errorClient.MIMETypes(context.Background()); err == nil {
+		t.Errorf("MIMETypes got no error, want an error")
 	}
 }
 
 func TestMetaRecursive_BadResponse(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, "invalid")
 	}))
 	defer ts.Close()
@@ -509,7 +492,7 @@ func TestMetaRecursive_BadResponse(t *testing.T) {
 }
 
 func TestMetaRecursive_BadFieldType(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, `{"super-alias":{}`)
 	}))
 	defer ts.Close()
@@ -542,10 +525,10 @@ func TestDetectors(t *testing.T) {
 			want: Detector{
 				Name: "TestDetector",
 				Children: []Detector{
-					Detector{
+					{
 						Name: "TestSubDetector1",
 					},
-					Detector{
+					{
 						Name: "TestSubDetector2",
 					},
 				},
@@ -565,7 +548,7 @@ func TestDetectors(t *testing.T) {
 				Name:      "TestDetector",
 				Composite: true,
 				Children: []Detector{
-					Detector{
+					{
 						Name: "TestSubDetector",
 					},
 				},
@@ -573,7 +556,7 @@ func TestDetectors(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprint(w, test.response)
 		}))
 		defer ts.Close()
@@ -600,13 +583,12 @@ func TestDetectorsError(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprint(w, test.response)
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
-		_, err := c.Detectors(context.Background())
-		if err == nil {
+		if _, err := c.Detectors(context.Background()); err == nil {
 			t.Errorf("Detectors got no error, want an error")
 		}
 	}

@@ -32,7 +32,7 @@ import (
 func init() {
 	// Overwrite the cmder to inject a dummy command. We simulate starting a server
 	// by running the TestHelperProcess.
-	cmder = func(cmd string, args ...string) *exec.Cmd {
+	cmder = func(ctx context.Context, cmd string, args ...string) *exec.Cmd {
 		c := exec.Command(os.Args[0], "-test.run=TestHelperProcess", "--", "sleep", "2")
 		c.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
 		return c
@@ -61,8 +61,7 @@ func TestNewServerError(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		_, err := NewServer(test.jar, test.options...)
-		if err == nil {
+		if _, err := NewServer(test.jar, test.options...); err == nil {
 			t.Errorf("NewServer(%s) got no error", test.name)
 		}
 	}
@@ -73,7 +72,7 @@ func TestStart(t *testing.T) {
 	if err != nil {
 		t.Skip("cannot find current test executable")
 	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, "1.14")
 	}))
 	defer ts.Close()
@@ -97,20 +96,19 @@ func TestStart(t *testing.T) {
 		s, err := NewServer(path, test.options...)
 		if err != nil {
 			t.Errorf("NewServer(%s) got error: %v", test.name, err)
+			continue
 		}
-		err = s.Start()
+		cancel, err := s.Start(context.Background())
 		if err != nil {
 			t.Errorf("Start(%s) got error: %v", test.name, err)
 		}
-		if err := s.Close(); err != nil {
-			t.Errorf("error closing test server: %v", err)
-		}
+		cancel()
 	}
 }
 
 func bouncyServer(bounce int) *httptest.Server {
 	bounced := 0
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		if bounced < bounce {
 			bounced++
 			w.WriteHeader(http.StatusInternalServerError)
@@ -153,9 +151,9 @@ func TestStartError(t *testing.T) {
 			t.Errorf("NewServer(%s) got error: %v", test.name, err)
 			continue
 		}
-		if err := s.Start(); err == nil {
+		if cancel, err := s.Start(context.TODO()); err == nil {
 			t.Errorf("s.Start(%s) got no error, want error", test.name)
-			s.Close()
+			cancel()
 		}
 	}
 }
@@ -203,31 +201,6 @@ func TestWaitForStart(t *testing.T) {
 	}
 }
 
-func TestClose(t *testing.T) {
-	s := &Server{}
-	if s.Close() == nil {
-		t.Errorf("Close got no error, want error")
-	}
-
-	c := exec.Command(os.Args[0], "-test.run=TestHelperProcess", "--", "sleep", "2")
-	c.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
-	s = &Server{cmd: c}
-	if err := c.Start(); err != nil {
-		t.Errorf("Start error: %v", err)
-	}
-
-	time.Sleep(1)
-	if err := s.Close(); err != nil {
-		t.Errorf("Close error: %v", err)
-	}
-
-	s.done = make(chan error, 1)
-	s.done <- nil
-	if err := s.Close(); err != nil {
-		t.Errorf("Close error: %v", err)
-	}
-}
-
 // TestHelperProcess isn't a real test. It's used as a helper process
 // for TestParameterRun.
 // Adapted from os/exec/exec_test.go.
@@ -245,8 +218,7 @@ func TestHelperProcess(*testing.T) {
 		}
 		args = args[1:]
 	}
-	switch args[0] {
-	case "sleep":
+	if args[0] == "sleep" {
 		l, err := strconv.Atoi(args[1])
 		if err != nil {
 			os.Exit(1)
@@ -279,7 +251,7 @@ func TestValidateFileMD5(t *testing.T) {
 	}
 	for _, test := range tests {
 		if got := validateFileMD5(test.path, test.md5String); got != test.want {
-			t.Errorf("validateFileMD5(%s, %s) = %t, want %t", test.path, test.md5String, got, test.want)
+			t.Errorf("validateFileMD5(%q, %q) = %t, want %t", test.path, test.md5String, got, test.want)
 		}
 	}
 }
@@ -293,7 +265,7 @@ func TestDownloadServerError(t *testing.T) {
 	}
 	for _, test := range tests {
 		if err := DownloadServer(context.Background(), test.version, test.path); err == nil {
-			t.Errorf("DownloadServer(%s, %s) got no error, want an error", test.version, test.path)
+			t.Errorf("DownloadServer(%q, %q) got no error, want an error", test.version, test.path)
 		}
 	}
 }

@@ -17,12 +17,11 @@ limitations under the License.
 package tika
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5"
-	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -40,8 +39,7 @@ type Server struct {
 	url      string // url is derived from port and hostname.
 	port     string
 	hostname string
-	cmd      *exec.Cmd
-	done     chan error
+	cancel   func()
 	timeout  time.Duration
 }
 
@@ -53,14 +51,14 @@ func (s *Server) URL() string {
 // An Option can be passed to NewServer to configure the Server.
 type Option func(*Server)
 
-// WithHostname returns an Option to set the host of the Server.
+// WithHostname returns an Option to set the host of the Server (default localhost).
 func WithHostname(h string) Option {
 	return func(s *Server) {
 		s.hostname = h
 	}
 }
 
-// WithPort returns an Option to set the port of the Server.
+// WithPort returns an Option to set the port of the Server (default 9998).
 func WithPort(p string) Option {
 	return func(s *Server) {
 		s.port = p
@@ -74,11 +72,6 @@ func WithStartupTimeout(d time.Duration) Option {
 		s.timeout = d
 	}
 }
-
-type commander func(string, ...string) *exec.Cmd
-
-// cmder is used to stub out *exec.Cmd for testing.
-var cmder commander = exec.Command
 
 // NewServer creates a new Server.
 func NewServer(jar string, options ...Option) (*Server, error) {
@@ -100,38 +93,45 @@ func NewServer(jar string, options ...Option) (*Server, error) {
 	urlString := "http://" + s.hostname + ":" + s.port
 	u, err := url.Parse(urlString)
 	if err != nil {
-		return nil, fmt.Errorf("invalid url %q: %v", urlString, err)
+		return nil, fmt.Errorf("invalid hostname %q or port %q: %v", s.hostname, s.port, err)
 	}
 	s.url = u.String()
 	return s, nil
 }
 
+type commander func(context.Context, string, ...string) *exec.Cmd
+
+// cmder is used to stub out *exec.Cmd for testing.
+var cmder commander = exec.CommandContext
+
 // Start starts the given server. Start will start a new Java process. The
-// caller must call Close() when finished with the Server.
-func (s *Server) Start() error {
-	s.cmd = cmder("java", "-jar", s.jar, "-p", s.port)
-	done := make(chan error, 1)
+// caller must call cancel() to shut down the process when finished with the
+// Server. The given Context is used for the Java process, not for cancellation
+// of startup.
+func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
+	ctx, cancel = context.WithCancel(ctx)
+	cmd := cmder(ctx, "java", "-jar", s.jar, "-p", s.port)
 
-	stderr, err := s.cmd.StderrPipe()
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return err
+		cancel()
+		return nil, err
 	}
 
-	if err := s.cmd.Start(); err != nil {
-		return err
+	if err := cmd.Start(); err != nil {
+		cancel()
+		return nil, err
 	}
-	go func() {
-		done <- s.cmd.Wait()
-	}()
 
 	if err := s.waitForStart(); err != nil {
-		buf := new(bytes.Buffer)
-		if _, err := buf.ReadFrom(stderr); err != nil {
-			return fmt.Errorf("error reading stderr: %v", err)
+		cancel()
+		buf, err := ioutil.ReadAll(stderr)
+		if err != nil {
+			return nil, fmt.Errorf("error reading stderr: %v", err)
 		}
-		return fmt.Errorf("%v: %v", err, buf.String())
+		return nil, fmt.Errorf("error starting server: %v: %v", err, string(buf))
 	}
-	return nil
+	return cancel, nil
 }
 
 // waitForServer waits until the given Server is responding to requests.
@@ -146,20 +146,6 @@ func (s Server) waitForStart() error {
 		time.Sleep(time.Second)
 	}
 	return err
-}
-
-// Close shuts the Server down, releasing resources. Callers are responsible
-// for calling Close after calling Start.
-func (s *Server) Close() error {
-	if s.cmd == nil {
-		return errors.New("Close called on invalid Server: did you call Start?")
-	}
-	select {
-	case err := <-s.done:
-		return err
-	default:
-		return s.cmd.Process.Kill()
-	}
 }
 
 func validateFileMD5(path, wantH string) bool {
@@ -185,14 +171,17 @@ const (
 	Version114 Version = "1.14"
 )
 
+var md5s = map[Version]string{
+	Version114: "39055fc71358d774b9da066f80b1141c",
+}
+
 // DownloadServer downloads and validates the given server version,
 // saving it at path. DownloadServer returns an error if it could
 // not be downloaded/validated. Valid values for the version are 1.14.
 // It is the callers responsibility to remove the file when no longer needed.
+// If the file already exists and has the correct MD5, DownloadServer will
+// do nothing.
 func DownloadServer(ctx context.Context, version Version, path string) error {
-	md5s := map[Version]string{
-		Version114: "39055fc71358d774b9da066f80b1141c",
-	}
 	wantH := md5s[version]
 	if wantH == "" {
 		return fmt.Errorf("unsupported Tika version: %s", version)
@@ -216,8 +205,7 @@ func DownloadServer(ctx context.Context, version Version, path string) error {
 	}
 	defer resp.Body.Close()
 
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
+	if _, err = io.Copy(out, resp.Body); err != nil {
 		return fmt.Errorf("error saving download: %v", err)
 	}
 
