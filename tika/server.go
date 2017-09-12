@@ -35,12 +35,12 @@ import (
 // There is no need to create a Server for an already running Tika Server
 // since you can pass its URL directly to a Client.
 type Server struct {
-	jar      string
-	url      string // url is derived from port and hostname.
-	port     string
-	hostname string
-	cancel   func()
-	timeout  time.Duration
+	jar            string
+	url            string // url is derived from port and hostname.
+	port           string
+	hostname       string
+	cancel         func()
+	startupTimeout time.Duration
 }
 
 // URL returns the URL of this Server.
@@ -66,10 +66,10 @@ func WithPort(p string) Option {
 }
 
 // WithStartupTimeout returns an Option to set the timeout for how long to wait
-// for the Server to start.
+// for the Server to start (default 10s).
 func WithStartupTimeout(d time.Duration) Option {
 	return func(s *Server) {
-		s.timeout = d
+		s.startupTimeout = d
 	}
 }
 
@@ -82,10 +82,10 @@ func NewServer(jar string, options ...Option) (*Server, error) {
 		return nil, fmt.Errorf("jar file not found: %s", jar)
 	}
 	s := &Server{
-		jar:      jar,
-		port:     "9998",
-		timeout:  10 * time.Second,
-		hostname: "localhost",
+		jar:            jar,
+		port:           "9998",
+		startupTimeout: 10 * time.Second,
+		hostname:       "localhost",
 	}
 	for _, o := range options {
 		o(s)
@@ -123,29 +123,34 @@ func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
 		return nil, err
 	}
 
-	if err := s.waitForStart(); err != nil {
+	if err := s.waitForStart(ctx); err != nil {
 		cancel()
-		buf, err := ioutil.ReadAll(stderr)
-		if err != nil {
+		buf, readErr := ioutil.ReadAll(stderr)
+		if readErr != nil {
 			return nil, fmt.Errorf("error reading stderr: %v", err)
 		}
-		return nil, fmt.Errorf("error starting server: %v: %v", err, string(buf))
+		// Report stderr since sometimes the server says why it failed to start.
+		return nil, fmt.Errorf("error starting server: %v\nserver stderr:\n\n%v", err, string(buf))
 	}
 	return cancel, nil
 }
 
 // waitForServer waits until the given Server is responding to requests.
-// waitForStart returns an error if the server does not respond within the timeout.
-func (s Server) waitForStart() error {
+// waitForStart returns an error if the server does not respond within the
+// timeout set by WithStartupTimeout or if ctx is Done() first.
+func (s Server) waitForStart(ctx context.Context) error {
 	c := NewClient(nil, s.url)
-	var err error
-	for i := time.Duration(0); i < s.timeout; i += time.Second {
-		if _, err = c.Version(context.Background()); err == nil {
+	ctx, cancel := context.WithTimeout(ctx, s.startupTimeout)
+	defer cancel()
+	select {
+	case <-time.Tick(500 * time.Millisecond):
+		if _, err := c.Version(ctx); err == nil {
 			return nil
 		}
-		time.Sleep(time.Second)
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	return err
+	return fmt.Errorf("could not reach server")
 }
 
 func validateFileMD5(path, wantH string) bool {
