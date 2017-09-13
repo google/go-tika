@@ -151,7 +151,7 @@ func TestStartError(t *testing.T) {
 			t.Errorf("NewServer(%s) got error: %v", test.name, err)
 			continue
 		}
-		if cancel, err := s.Start(context.TODO()); err == nil {
+		if cancel, err := s.Start(context.Background()); err == nil {
 			t.Errorf("s.Start(%s) got no error, want error", test.name)
 			cancel()
 		}
