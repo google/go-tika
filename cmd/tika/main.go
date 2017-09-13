@@ -136,9 +136,8 @@ func process(c *tika.Client, action string, file io.Reader) (string, error) {
 		if *recursive {
 			bs, err := c.ParseRecursive(context.Background(), file)
 			return strings.Join(bs, "\n"), err
-		} else {
-			return c.Parse(context.Background(), file)
 		}
+		return c.Parse(context.Background(), file)
 	case detect:
 		return c.Detect(context.Background(), file)
 	case language:
