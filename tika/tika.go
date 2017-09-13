@@ -55,7 +55,7 @@ type Parser struct {
 	SupportedTypes []string
 }
 
-// MIMEType represents a Tika Mime Type. To get a list of all MimeTypes, see
+// MIMEType represents a Tika Mime Type. To get a list of all MIMETypes, see
 // MimeTypes.
 type MIMEType struct {
 	Alias     []string

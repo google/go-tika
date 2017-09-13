@@ -127,7 +127,7 @@ func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
 		cancel()
 		buf, readErr := ioutil.ReadAll(stderr)
 		if readErr != nil {
-			return nil, fmt.Errorf("error reading stderr: %v", err)
+			return nil, fmt.Errorf("error reading stderr: %v", readErr)
 		}
 		// Report stderr since sometimes the server says why it failed to start.
 		return nil, fmt.Errorf("error starting server: %v\nserver stderr:\n\n%v", err, string(buf))
@@ -184,7 +184,7 @@ var md5s = map[Version]string{
 // DownloadServer downloads and validates the given server version,
 // saving it at path. DownloadServer returns an error if it could
 // not be downloaded/validated. Valid values for the version are 1.14.
-// It is the callers responsibility to remove the file when no longer needed.
+// It is the caller's responsibility to remove the file when no longer needed.
 // If the file already exists and has the correct MD5, DownloadServer will
 // do nothing.
 func DownloadServer(ctx context.Context, version Version, path string) error {
