@@ -145,7 +145,8 @@ func process(c *tika.Client, action string, file io.Reader) (string, error) {
 	case meta:
 		if *metaField != "" {
 			return c.MetaField(context.Background(), file, *metaField)
-		} else if *recursive {
+		}
+		if *recursive {
 			mr, err := c.MetaRecursive(context.Background(), file)
 			if err != nil {
 				return "", err
