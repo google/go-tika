@@ -155,9 +155,8 @@ func process(c *tika.Client, action string, file io.Reader) (string, error) {
 				return "", err
 			}
 			return string(bytes), nil
-		} else {
-			return c.Meta(context.Background(), file)
 		}
+		return c.Meta(context.Background(), file)
 	case version:
 		return c.Version(context.Background())
 	case parsers:
