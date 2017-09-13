@@ -231,8 +231,8 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 var jsonHeader = http.Header{"Accept": []string{"application/json"}}
 
 // callUnmarshal is like call, but unmarshals the JSON response into v.
-func (c *Client) callUnmarshal(ctx context.Context, method, path string, header http.Header, v interface{}) error {
-	body, err := c.call(ctx, nil, method, path, header)
+func (c *Client) callUnmarshal(ctx context.Context, path string, v interface{}) error {
+	body, err := c.call(ctx, nil, "GET", path, jsonHeader)
 	if err != nil {
 		return err
 	}
@@ -244,7 +244,7 @@ func (c *Client) callUnmarshal(ctx context.Context, method, path string, header 
 // the Children of every Parser.
 func (c *Client) Parsers(ctx context.Context) (*Parser, error) {
 	p := new(Parser)
-	if err := c.callUnmarshal(ctx, "GET", "/parsers/details", jsonHeader, p); err != nil {
+	if err := c.callUnmarshal(ctx, "/parsers/details", p); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -253,18 +253,18 @@ func (c *Client) Parsers(ctx context.Context) (*Parser, error) {
 // MIMETypes returns a map from MIME Type name to MIMEType, or properties about
 // that specific MIMEType.
 func (c *Client) MIMETypes(ctx context.Context) (map[string]MIMEType, error) {
-	mt := new(map[string]MIMEType)
-	if err := c.callUnmarshal(ctx, "GET", "/mime-types", jsonHeader, mt); err != nil {
+	mt := make(map[string]MIMEType)
+	if err := c.callUnmarshal(ctx, "/mime-types", &mt); err != nil {
 		return nil, err
 	}
-	return *mt, nil
+	return mt, nil
 }
 
 // Detectors returns the list of available Detectors for this server. To get all
 // available detectors, iterate through the Children of every Detector.
 func (c *Client) Detectors(ctx context.Context) (*Detector, error) {
 	d := new(Detector)
-	if err := c.callUnmarshal(ctx, "GET", "/detectors", jsonHeader, d); err != nil {
+	if err := c.callUnmarshal(ctx, "/detectors", d); err != nil {
 		return nil, err
 	}
 	return d, nil
