@@ -142,15 +142,16 @@ func (s Server) waitForStart(ctx context.Context) error {
 	c := NewClient(nil, s.url)
 	ctx, cancel := context.WithTimeout(ctx, s.startupTimeout)
 	defer cancel()
-	select {
-	case <-time.Tick(500 * time.Millisecond):
-		if _, err := c.Version(ctx); err == nil {
-			return nil
+	for {
+		select {
+		case <-time.Tick(500 * time.Millisecond):
+			if _, err := c.Version(ctx); err == nil {
+				return nil
+			}
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-	case <-ctx.Done():
-		return ctx.Err()
 	}
-	return fmt.Errorf("could not reach server")
 }
 
 func validateFileMD5(path, wantH string) bool {

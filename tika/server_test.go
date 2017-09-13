@@ -185,8 +185,8 @@ func TestWaitForStart(t *testing.T) {
 			t.Parallel()
 			ts := bouncyServer(test.reqToBounce)
 			defer ts.Close()
-			s := &Server{url: ts.URL, timeout: test.timeout}
-			got := s.waitForStart()
+			s := &Server{url: ts.URL, startupTimeout: test.timeout}
+			got := s.waitForStart(context.Background())
 			if test.wantError && got == nil {
 				t.Errorf("waitForStart(%s) got no error, want error", test.name)
 			}
