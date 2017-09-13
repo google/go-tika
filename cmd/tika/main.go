@@ -85,13 +85,14 @@ func main() {
 		log.Fatal("no URL specified: set serverURL, serverJAR and/or downloadVersion")
 	}
 
+	var cancel func()
 	if *serverJAR != "" {
 		s, err := tika.NewServer(*serverJAR)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		cancel, err := s.Start(context.Background())
+		cancel, err = s.Start(context.Background())
 		if err != nil {
 			log.Fatalf("could not start server: %v", err)
 		}
@@ -100,96 +101,95 @@ func main() {
 		*serverURL = s.URL()
 	}
 
-	var body string
 	var file io.Reader
-	var err error
 
 	// Check actions requiring input have an input and get it.
 	switch action {
 	case parse, detect, language, meta:
 		if *filename == "" {
+			cancel()
 			log.Fatalf("error: you must provide an input filename")
 		}
+		var err error
 		file, err = os.Open(*filename)
 		if err != nil {
+			cancel()
 			log.Fatalf("error opening file: %v", err)
 		}
 	}
 
 	c := tika.NewClient(nil, *serverURL)
+	b, err := process(c, action, file)
+	if err != nil {
+		cancel()
+		log.Fatalf("tika error: %v", err)
+	}
+	fmt.Println(b)
+}
 
+func process(c *tika.Client, action string, file io.Reader) (string, error) {
 	switch action {
 	default:
 		flag.Usage()
-		log.Fatalf("error: invalid action %q", action)
+		return "", fmt.Errorf("error: invalid action %q", action)
 	case parse:
 		if *recursive {
-			var bs []string
-			bs, err = c.ParseRecursive(context.Background(), file)
-			body = strings.Join(bs, "\n")
+			bs, err := c.ParseRecursive(context.Background(), file)
+			return strings.Join(bs, "\n"), err
 		} else {
-			body, err = c.Parse(context.Background(), file)
+			return c.Parse(context.Background(), file)
 		}
 	case detect:
-		body, err = c.Detect(context.Background(), file)
+		return c.Detect(context.Background(), file)
 	case language:
-		body, err = c.Language(context.Background(), file)
+		return c.Language(context.Background(), file)
 	case meta:
 		if *metaField != "" {
-			body, err = c.MetaField(context.Background(), file, *metaField)
+			return c.MetaField(context.Background(), file, *metaField)
 		} else if *recursive {
-			var mr []map[string][]string
-			mr, err = c.MetaRecursive(context.Background(), file)
-			var bytes []byte
-			bytes, err = json.MarshalIndent(mr, "", "  ")
+			mr, err := c.MetaRecursive(context.Background(), file)
 			if err != nil {
-				log.Fatalf("json marshal error: %v", err)
+				return "", err
 			}
-			body = string(bytes)
+			bytes, err := json.MarshalIndent(mr, "", "  ")
+			if err != nil {
+				return "", err
+			}
+			return string(bytes), nil
 		} else {
-			body, err = c.Meta(context.Background(), file)
+			return c.Meta(context.Background(), file)
 		}
 	case version:
-		body, err = c.Version(context.Background())
+		return c.Version(context.Background())
 	case parsers:
-		var p *tika.Parser
-		p, err = c.Parsers(context.Background())
+		p, err := c.Parsers(context.Background())
 		if err != nil {
-			log.Fatalf("tika %v error: %v", action, err)
+			return "", err
 		}
-		var bytes []byte
-		bytes, err = json.MarshalIndent(p, "", "  ")
+		bytes, err := json.MarshalIndent(p, "", "  ")
 		if err != nil {
-			log.Fatalf("json marshal error: %v", err)
+			return "", err
 		}
-		body = string(bytes)
+		return string(bytes), nil
 	case mimeTypes:
-		var mt map[string]tika.MIMEType
-		mt, err = c.MIMETypes(context.Background())
+		mt, err := c.MIMETypes(context.Background())
 		if err != nil {
-			log.Fatalf("tika %v error: %v", action, err)
+			return "", err
 		}
-		var bytes []byte
-		bytes, err = json.MarshalIndent(mt, "", "  ")
+		bytes, err := json.MarshalIndent(mt, "", "  ")
 		if err != nil {
-			log.Fatalf("json marshal error: %v", err)
+			return "", err
 		}
-		body = string(bytes)
+		return string(bytes), nil
 	case detectors:
-		var d *tika.Detector
-		d, err = c.Detectors(context.Background())
+		d, err := c.Detectors(context.Background())
 		if err != nil {
-			log.Fatalf("tika %v error: %v\n", action, err)
+			return "", err
 		}
-		var bytes []byte
-		bytes, err = json.MarshalIndent(d, "", "  ")
+		bytes, err := json.MarshalIndent(d, "", "  ")
 		if err != nil {
-			log.Fatalf("json marshal error: %v", err)
+			return "", err
 		}
-		body = string(bytes)
+		return string(bytes), nil
 	}
-	if err != nil {
-		log.Fatalf("tika %q error: %v\n", action, err)
-	}
-	fmt.Println(body)
 }
