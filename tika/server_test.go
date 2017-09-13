@@ -32,7 +32,7 @@ import (
 func init() {
 	// Overwrite the cmder to inject a dummy command. We simulate starting a server
 	// by running the TestHelperProcess.
-	cmder = func(ctx context.Context, cmd string, args ...string) *exec.Cmd {
+	cmder = func(context.Context, string, ...string) *exec.Cmd {
 		c := exec.Command(os.Args[0], "-test.run=TestHelperProcess", "--", "sleep", "2")
 		c.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
 		return c
