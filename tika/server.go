@@ -211,7 +211,7 @@ func DownloadServer(ctx context.Context, version Version, path string) error {
 	}
 	defer resp.Body.Close()
 
-	if _, err = io.Copy(out, resp.Body); err != nil {
+	if _, err := io.Copy(out, resp.Body); err != nil {
 		return fmt.Errorf("error saving download: %v", err)
 	}
 

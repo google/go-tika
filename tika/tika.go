@@ -190,7 +190,7 @@ func (c *Client) MetaRecursive(ctx context.Context, input io.Reader) ([]map[stri
 		return nil, err
 	}
 	var m []map[string]interface{}
-	if err = json.Unmarshal(body, &m); err != nil {
+	if err := json.Unmarshal(body, &m); err != nil {
 		return nil, err
 	}
 	var r []map[string][]string
