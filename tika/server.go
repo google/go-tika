@@ -31,7 +31,8 @@ import (
 )
 
 // Server represents a Tika server. Create a new Server with NewServer,
-// start it with StartServer, and shut it down with Close.
+// start it with Start, and shut it down with the close function returned
+// from Start.
 // There is no need to create a Server for an already running Tika Server
 // since you can pass its URL directly to a Client.
 type Server struct {
