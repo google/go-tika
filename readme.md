@@ -5,7 +5,7 @@
 
 go-tika is a Go client library and command line utility for accessing the [Apache Tika](http://tika.apache.org) Server API.
 
-go-tika requires Go version 1.7 or greater.
+go-tika requires Go version 1.8 or greater.
 
 See [the godoc](https://godoc.org/github.com/google/go-tika/tika) for more documentation on what resources are available.
 
