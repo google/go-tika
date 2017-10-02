@@ -2,6 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/google/go-tika?status.svg)](http://godoc.org/github.com/google/go-tika/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/google/go-tika)](https://goreportcard.com/report/github.com/google/go-tika)
+[![Build Status](https://travis-ci.org/google/go-tika.svg?branch=master)](https://travis-ci.org/google/go-tika)
 
 go-tika is a Go client library and command line utility for accessing the [Apache Tika](http://tika.apache.org) Server API.
 
