@@ -25,14 +25,14 @@ have a server that is already running and you don't have the Server
 JAR already downloaded, you can download one. The caller is responsible
 for removing the file when no longer needed.
 
-	err := tika.DownloadServer(context.Background(), "1.14", "tika-server-1.14.jar")
+	err := tika.DownloadServer(context.Background(), "1.16", "tika-server-1.16.jar")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 If you don't have a running Tika Server, you can start one.
 
-	s, err := tika.NewServer("tika-server-1.14.jar")
+	s, err := tika.NewServer("tika-server-1.16.jar")
 	if err != nil {
 		log.Fatal(err)
 	}

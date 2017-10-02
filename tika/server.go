@@ -155,19 +155,19 @@ func (s Server) waitForStart(ctx context.Context) error {
 	}
 }
 
-func validateFileMD5(path, wantH string) bool {
+func validateFileMD5(path, wantH string) (bool, string) {
 	f, err := os.Open(path)
 	if err != nil {
-		return false
+		return false, ""
 	}
 	defer f.Close()
 
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return false
+		return false, ""
 	}
-
-	return fmt.Sprintf("%x", h.Sum(nil)) == wantH
+	md5 := fmt.Sprintf("%x", h.Sum(nil))
+	return md5 == wantH, md5
 }
 
 // A Version represents a Tika Server version.
@@ -176,10 +176,14 @@ type Version string
 // Supported versions of Tika Server.
 const (
 	Version114 Version = "1.14"
+	Version115 Version = "1.15"
+	Version116 Version = "1.16"
 )
 
 var md5s = map[Version]string{
 	Version114: "39055fc71358d774b9da066f80b1141c",
+	Version115: "80bd3f00f05326d5190466de27d593dd",
+	Version116: "6a549ce6ef6e186e019766059fd82fb2",
 }
 
 // DownloadServer downloads and validates the given server version,
@@ -195,7 +199,7 @@ func DownloadServer(ctx context.Context, version Version, path string) error {
 	}
 
 	if _, err := os.Stat(path); err == nil {
-		if validateFileMD5(path, wantH) {
+		if ok, _ := validateFileMD5(path, wantH); ok {
 			return nil
 		}
 	}
@@ -216,11 +220,11 @@ func DownloadServer(ctx context.Context, version Version, path string) error {
 		return fmt.Errorf("error saving download: %v", err)
 	}
 
-	if !validateFileMD5(path, wantH) {
+	if ok, md5 := validateFileMD5(path, wantH); !ok {
 		if err := os.Remove(path); err != nil {
-			return fmt.Errorf("invalid md5: error removing %s: %v", path, err)
+			return fmt.Errorf("invalid md5: %s: error removing %s: %v", md5, path, err)
 		}
-		return fmt.Errorf("invalid md5")
+		return fmt.Errorf("invalid md5: %s", md5)
 	}
 	return nil
 }
