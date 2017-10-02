@@ -250,7 +250,7 @@ func TestValidateFileMD5(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if got := validateFileMD5(test.path, test.md5String); got != test.want {
+		if got, _ := validateFileMD5(test.path, test.md5String); got != test.want {
 			t.Errorf("validateFileMD5(%q, %q) = %t, want %t", test.path, test.md5String, got, test.want)
 		}
 	}
