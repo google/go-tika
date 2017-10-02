@@ -26,7 +26,7 @@ This will store tika-server-1.14.jar in your current working directory. If you w
 
 If you already have a downloaded Apache Tika Server JAR, you can specify it with the `-server_jar` flag and it will not be re-downloaded.
 
-If you already have a running Apache Tika Server, you can use it by adding the `-server_url` flag and omitting the `-server_jar` and `-downloard_version` flags.
+If you already have a running Apache Tika Server, you can use it by adding the `-server_url` flag and omitting the `-server_jar` and `-download_version` flags.
 
 See `$GOPATH/bin/tika -h` for usage instructions.
 
