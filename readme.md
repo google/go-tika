@@ -1,5 +1,7 @@
 # go-tika
 
+[![GoDoc](https://godoc.org/github.com/google/go-tika?status.svg)](http://godoc.org/github.com/google/go-tika/)
+
 go-tika is a Go client library and command line utility for accessing the [Apache Tika](http://tika.apache.org) Server API.
 
 go-tika requires Go version 1.7 or greater.
