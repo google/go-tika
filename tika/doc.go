@@ -36,7 +36,7 @@ If you don't have a running Tika Server, you can start one.
 	if err != nil {
 		log.Fatal(err)
 	}
-	cancel, err := s.Start()
+	cancel, err := s.Start(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -55,7 +55,7 @@ create a client, and call client.Parse.
 	defer f.Close()
 
 	client := tika.NewClient(nil, s.URL())
-	body, err := client.Parse(context.Background, f)
+	body, err := client.Parse(context.Background(), f)
 
 If you pass an *http.Client to tika.NewClient, it will be used for all requests.
 
