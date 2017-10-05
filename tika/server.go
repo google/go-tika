@@ -36,12 +36,10 @@ import (
 // There is no need to create a Server for an already running Tika Server
 // since you can pass its URL directly to a Client.
 type Server struct {
-	jar            string
-	url            string // url is derived from port and hostname.
-	port           string
-	hostname       string
-	cancel         func()
-	startupTimeout time.Duration
+	jar      string
+	url      string // url is derived from port and hostname.
+	port     string
+	hostname string
 }
 
 // URL returns the URL of this Server.
@@ -66,14 +64,6 @@ func WithPort(p string) Option {
 	}
 }
 
-// WithStartupTimeout returns an Option to set the timeout for how long to wait
-// for the Server to start (default 10s).
-func WithStartupTimeout(d time.Duration) Option {
-	return func(s *Server) {
-		s.startupTimeout = d
-	}
-}
-
 // NewServer creates a new Server.
 func NewServer(jar string, options ...Option) (*Server, error) {
 	if jar == "" {
@@ -83,10 +73,9 @@ func NewServer(jar string, options ...Option) (*Server, error) {
 		return nil, fmt.Errorf("jar file not found: %s", jar)
 	}
 	s := &Server{
-		jar:            jar,
-		port:           "9998",
-		startupTimeout: 10 * time.Second,
-		hostname:       "localhost",
+		jar:      jar,
+		port:     "9998",
+		hostname: "localhost",
 	}
 	for _, o := range options {
 		o(s)
@@ -136,13 +125,10 @@ func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
 	return cancel, nil
 }
 
-// waitForServer waits until the given Server is responding to requests.
-// waitForStart returns an error if the server does not respond within the
-// timeout set by WithStartupTimeout or if ctx is Done() first.
+// waitForServer waits until the given Server is responding to requests or
+// ctx is Done().
 func (s Server) waitForStart(ctx context.Context) error {
 	c := NewClient(nil, s.url)
-	ctx, cancel := context.WithTimeout(ctx, s.startupTimeout)
-	defer cancel()
 	for {
 		select {
 		case <-time.Tick(500 * time.Millisecond):
