@@ -41,14 +41,15 @@ func init() {
 
 func TestNewServerError(t *testing.T) {
 	tests := []struct {
-		name    string
-		jar     string
-		options []Option
+		name string
+		jar  string
+		port string
 	}{
 		{name: "no jar path"},
+		{name: "invalid port", jar: "jar/path", port: "%31"},
 	}
 	for _, test := range tests {
-		if _, err := NewServer(test.jar, test.options...); err == nil {
+		if _, err := NewServer(test.jar, test.port); err == nil {
 			t.Errorf("NewServer(%s) got no error", test.name)
 		}
 	}
@@ -67,29 +68,16 @@ func TestStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating test server: %v", err)
 	}
-	tests := []struct {
-		name    string
-		options []Option
-	}{
-		{
-			name: "basic config",
-			options: []Option{
-				WithPort(tsURL.Port()),
-			},
-		},
+
+	s, err := NewServer(path, tsURL.Port())
+	if err != nil {
+		t.Fatalf("NewServer got error: %v", err)
 	}
-	for _, test := range tests {
-		s, err := NewServer(path, test.options...)
-		if err != nil {
-			t.Errorf("NewServer(%s) got error: %v", test.name, err)
-			continue
-		}
-		cancel, err := s.Start(context.Background())
-		if err != nil {
-			t.Errorf("Start(%s) got error: %v", test.name, err)
-		}
-		cancel()
+	cancel, err := s.Start(context.Background())
+	if err != nil {
+		t.Fatalf("Start got error: %v", err)
 	}
+	cancel()
 }
 
 func bouncyServer(bounce int) *httptest.Server {
@@ -116,31 +104,14 @@ func TestStartError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating test server: %v", err)
 	}
-	tests := []struct {
-		name    string
-		jar     string
-		options []Option
-	}{
-		{
-			name: "unresponsive server",
-			jar:  path,
-			options: []Option{
-				WithPort(tsURL.Port()),
-			},
-		},
+	s, err := NewServer(path, tsURL.Port())
+	if err != nil {
+		t.Fatalf("NewServer got error: %v", err)
 	}
-	for _, test := range tests {
-		s, err := NewServer(test.jar, test.options...)
-		if err != nil {
-			t.Errorf("NewServer(%s) got error: %v", test.name, err)
-			continue
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		if cancel, err := s.Start(ctx); err == nil {
-			t.Errorf("s.Start(%s) got no error, want error", test.name)
-			cancel()
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := s.Start(ctx); err == nil {
+		t.Fatalf("s.Start got no error, want error")
 	}
 }
 
