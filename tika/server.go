@@ -67,10 +67,7 @@ func NewServer(jar, port string) (*Server, error) {
 	return s, nil
 }
 
-type commander func(context.Context, string, ...string) *exec.Cmd
-
-// cmder is used to stub out *exec.Cmd for testing.
-var cmder commander = exec.CommandContext
+var commandContext = exec.CommandContext
 
 // Start starts the given server. Start will start a new Java process. The
 // caller must call cancel() to shut down the process when finished with the
@@ -78,7 +75,7 @@ var cmder commander = exec.CommandContext
 // of startup.
 func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
 	ctx, cancel = context.WithCancel(ctx)
-	cmd := cmder(ctx, "java", "-jar", s.jar, "-p", s.port)
+	cmd := commandContext(ctx, "java", "-jar", s.jar, "-p", s.port)
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
