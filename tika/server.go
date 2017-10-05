@@ -96,9 +96,11 @@ func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
 // ctx is Done().
 func (s Server) waitForStart(ctx context.Context) error {
 	c := NewClient(nil, s.url)
+	t := time.NewTicker(500 * time.Millisecond)
+	defer t.Stop()
 	for {
 		select {
-		case <-time.Tick(500 * time.Millisecond):
+		case <-t.C:
 			if _, err := c.Version(ctx); err == nil {
 				return nil
 			}
