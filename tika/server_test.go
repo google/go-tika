@@ -141,7 +141,6 @@ func TestStartError(t *testing.T) {
 			options: []Option{
 				WithHostname(tsURL.Hostname()),
 				WithPort(tsURL.Port()),
-				WithStartupTimeout(2 * time.Second),
 			},
 		},
 	}
@@ -151,7 +150,9 @@ func TestStartError(t *testing.T) {
 			t.Errorf("NewServer(%s) got error: %v", test.name, err)
 			continue
 		}
-		if cancel, err := s.Start(context.Background()); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		if cancel, err := s.Start(ctx); err == nil {
 			t.Errorf("s.Start(%s) got no error, want error", test.name)
 			cancel()
 		}
@@ -185,8 +186,10 @@ func TestWaitForStart(t *testing.T) {
 			t.Parallel()
 			ts := bouncyServer(test.reqToBounce)
 			defer ts.Close()
-			s := &Server{url: ts.URL, startupTimeout: test.timeout}
-			got := s.waitForStart(context.Background())
+			s := &Server{url: ts.URL}
+			ctx, cancel := context.WithTimeout(context.Background(), test.timeout)
+			defer cancel()
+			got := s.waitForStart(ctx)
 			if test.wantError && got == nil {
 				t.Errorf("waitForStart(%s) got no error, want error", test.name)
 			}
