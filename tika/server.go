@@ -69,9 +69,6 @@ func NewServer(jar string, options ...Option) (*Server, error) {
 	if jar == "" {
 		return nil, fmt.Errorf("no jar file specified")
 	}
-	if _, err := os.Stat(jar); err != nil {
-		return nil, fmt.Errorf("jar file not found: %s", jar)
-	}
 	s := &Server{
 		jar:      jar,
 		port:     "9998",
