@@ -152,11 +152,9 @@ func DownloadServer(ctx context.Context, v version, path string) error {
 		return fmt.Errorf("unsupported Tika version: %s", v)
 	}
 
-	if _, err := os.Stat(path); err == nil {
-		if got, err := md5Hash(path); err == nil {
-			if got == hash {
-				return nil
-			}
+	if got, err := md5Hash(path); err == nil {
+		if got == hash {
+			return nil
 		}
 	}
 	out, err := os.Create(path)
