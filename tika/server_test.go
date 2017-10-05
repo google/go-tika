@@ -40,21 +40,12 @@ func init() {
 }
 
 func TestNewServerError(t *testing.T) {
-	path, err := os.Executable() // Use the text executable path as a dummy jar.
-	if err != nil {
-		t.Skip("cannot find current test executable")
-	}
 	tests := []struct {
 		name    string
 		jar     string
 		options []Option
 	}{
 		{name: "no jar path"},
-		{
-			name:    "invalid hostname",
-			jar:     path,
-			options: []Option{WithHostname("192.168.0.%31")},
-		},
 	}
 	for _, test := range tests {
 		if _, err := NewServer(test.jar, test.options...); err == nil {
@@ -83,7 +74,6 @@ func TestStart(t *testing.T) {
 		{
 			name: "basic config",
 			options: []Option{
-				WithHostname(tsURL.Hostname()),
 				WithPort(tsURL.Port()),
 			},
 		},
@@ -135,7 +125,6 @@ func TestStartError(t *testing.T) {
 			name: "unresponsive server",
 			jar:  path,
 			options: []Option{
-				WithHostname(tsURL.Hostname()),
 				WithPort(tsURL.Port()),
 			},
 		},
