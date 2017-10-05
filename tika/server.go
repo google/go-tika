@@ -36,10 +36,9 @@ import (
 // There is no need to create a Server for an already running Tika Server
 // since you can pass its URL directly to a Client.
 type Server struct {
-	jar      string
-	url      string // url is derived from port and hostname.
-	port     string
-	hostname string
+	jar  string
+	url  string // url is derived from port.
+	port string
 }
 
 // URL returns the URL of this Server.
@@ -49,13 +48,6 @@ func (s *Server) URL() string {
 
 // An Option can be passed to NewServer to configure the Server.
 type Option func(*Server)
-
-// WithHostname returns an Option to set the host of the Server (default localhost).
-func WithHostname(h string) Option {
-	return func(s *Server) {
-		s.hostname = h
-	}
-}
 
 // WithPort returns an Option to set the port of the Server (default 9998).
 func WithPort(p string) Option {
@@ -70,17 +62,16 @@ func NewServer(jar string, options ...Option) (*Server, error) {
 		return nil, fmt.Errorf("no jar file specified")
 	}
 	s := &Server{
-		jar:      jar,
-		port:     "9998",
-		hostname: "localhost",
+		jar:  jar,
+		port: "9998",
 	}
 	for _, o := range options {
 		o(s)
 	}
-	urlString := "http://" + s.hostname + ":" + s.port
+	urlString := "http://localhost:" + s.port
 	u, err := url.Parse(urlString)
 	if err != nil {
-		return nil, fmt.Errorf("invalid hostname %q or port %q: %v", s.hostname, s.port, err)
+		return nil, fmt.Errorf("invalid port %q: %v", s.port, err)
 	}
 	s.url = u.String()
 	return s, nil
