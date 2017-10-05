@@ -193,31 +193,27 @@ func TestValidateFileMD5(t *testing.T) {
 	}
 
 	tests := []struct {
-		path      string
-		md5String string
-		want      bool
+		path    string
+		wantErr bool
 	}{
-		{
-			"path_to_non_existent_file",
-			"does not match",
-			false,
-		},
-		{
-			path,
-			"does not match",
-			false,
-		},
+		{"path_to_non_existent_file", true},
+		{path, false},
 	}
 	for _, test := range tests {
-		if got, _ := validateFileMD5(test.path, test.md5String); got != test.want {
-			t.Errorf("validateFileMD5(%q, %q) = %t, want %t", test.path, test.md5String, got, test.want)
+		_, err := md5Hash(test.path)
+		if test.wantErr && err == nil {
+			t.Errorf("md5Hash(%s) wanted an error", test.path)
+			continue
+		}
+		if !test.wantErr && err != nil {
+			t.Errorf("md5Hash(%s) got an error: %v", test.path, err)
 		}
 	}
 }
 
 func TestDownloadServerError(t *testing.T) {
 	tests := []struct {
-		version Version
+		version version
 		path    string
 	}{
 		{"1.0", ""},
