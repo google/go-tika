@@ -46,27 +46,17 @@ func (s *Server) URL() string {
 	return s.url
 }
 
-// An Option can be passed to NewServer to configure the Server.
-type Option func(*Server)
-
-// WithPort returns an Option to set the port of the Server (default 9998).
-func WithPort(p string) Option {
-	return func(s *Server) {
-		s.port = p
-	}
-}
-
-// NewServer creates a new Server.
-func NewServer(jar string, options ...Option) (*Server, error) {
+// NewServer creates a new Server. The default port is 9998.
+func NewServer(jar, port string) (*Server, error) {
 	if jar == "" {
 		return nil, fmt.Errorf("no jar file specified")
 	}
+	if port == "" {
+		port = "9998"
+	}
 	s := &Server{
 		jar:  jar,
-		port: "9998",
-	}
-	for _, o := range options {
-		o(s)
+		port: port,
 	}
 	urlString := "http://localhost:" + s.port
 	u, err := url.Parse(urlString)
@@ -108,7 +98,7 @@ func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
 			return nil, fmt.Errorf("error reading stderr: %v", readErr)
 		}
 		// Report stderr since sometimes the server says why it failed to start.
-		return nil, fmt.Errorf("error starting server: %v\nserver stderr:\n\n%v", err, string(buf))
+		return nil, fmt.Errorf("error starting server: %v\nserver stderr:\n\n%s", err, buf)
 	}
 	return cancel, nil
 }

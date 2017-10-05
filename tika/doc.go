@@ -32,7 +32,8 @@ for removing the file when no longer needed.
 
 If you don't have a running Tika Server, you can start one.
 
-	s, err := tika.NewServer("tika-server-1.16.jar")
+	// Optionally pass a port as the second argument.
+	s, err := tika.NewServer("tika-server-1.16.jar", "")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,8 +42,6 @@ If you don't have a running Tika Server, you can start one.
 		log.Fatal(err)
 	}
 	defer cancel()
-
-Pass tika.Options to NewServer control the Server's behavior.
 
 To parse the contents of a file (or any io.Reader), you will need to open the io.Reader,
 create a client, and call client.Parse.
