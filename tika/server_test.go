@@ -51,10 +51,6 @@ func TestNewServerError(t *testing.T) {
 	}{
 		{name: "no jar path"},
 		{
-			name: "invalid jar path",
-			jar:  "/invalid/jar/path.jar",
-		},
-		{
 			name:    "invalid hostname",
 			jar:     path,
 			options: []Option{WithHostname("192.168.0.%31")},
