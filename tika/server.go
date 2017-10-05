@@ -21,7 +21,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -71,17 +70,10 @@ var commandContext = exec.CommandContext
 
 // Start starts the given server. Start will start a new Java process. The
 // caller must call cancel() to shut down the process when finished with the
-// Server. The given Context is used for the Java process, not for cancellation
-// of startup.
+// Server. The given Context is used for the Java process.
 func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
 	ctx, cancel = context.WithCancel(ctx)
 	cmd := commandContext(ctx, "java", "-jar", s.jar, "-p", s.port)
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		cancel()
-		return nil, err
-	}
 
 	if err := cmd.Start(); err != nil {
 		cancel()
@@ -90,12 +82,12 @@ func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
 
 	if err := s.waitForStart(ctx); err != nil {
 		cancel()
-		buf, readErr := ioutil.ReadAll(stderr)
+		out, readErr := cmd.CombinedOutput()
 		if readErr != nil {
-			return nil, fmt.Errorf("error reading stderr: %v", readErr)
+			return nil, fmt.Errorf("error reading output: %v", readErr)
 		}
 		// Report stderr since sometimes the server says why it failed to start.
-		return nil, fmt.Errorf("error starting server: %v\nserver stderr:\n\n%s", err, buf)
+		return nil, fmt.Errorf("error starting server: %v\nserver stderr:\n\n%s", err, out)
 	}
 	return cancel, nil
 }
