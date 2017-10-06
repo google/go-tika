@@ -80,6 +80,8 @@ func main() {
 			v = tika.Version115
 		case "1.16":
 			v = tika.Version116
+		default:
+			log.Fatalf("unsupported server version: %q", *downloadVersion)
 		}
 		if *serverJAR == "" {
 			*serverJAR = "tika-server-" + *downloadVersion + ".jar"
