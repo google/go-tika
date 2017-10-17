@@ -32,7 +32,7 @@ import (
 func init() {
 	// Overwrite the cmder to inject a dummy command. We simulate starting a server
 	// by running the TestHelperProcess.
-	commandContext = func(context.Context, string, ...string) *exec.Cmd {
+	command = func(string, ...string) *exec.Cmd {
 		c := exec.Command(os.Args[0], "-test.run=TestHelperProcess", "--", "sleep", "2")
 		c.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
 		return c
@@ -73,11 +73,11 @@ func TestStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer got error: %v", err)
 	}
-	cancel, err := s.Start(context.Background())
+	err = s.Start(context.Background())
 	if err != nil {
 		t.Fatalf("Start got error: %v", err)
 	}
-	cancel()
+	s.Stop()
 }
 
 func bouncyServer(bounce int) *httptest.Server {
@@ -110,7 +110,7 @@ func TestStartError(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if _, err := s.Start(ctx); err == nil {
+	if err := s.Start(ctx); err == nil {
 		t.Fatalf("s.Start got no error, want error")
 	}
 }
