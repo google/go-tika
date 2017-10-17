@@ -37,11 +37,11 @@ If you don't have a running Tika Server, you can start one.
 	if err != nil {
 		log.Fatal(err)
 	}
-	cancel, err := s.Start(context.Background())
+	err := s.Start(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cancel()
+	defer s.Stop()
 
 To parse the contents of a file (or any io.Reader), you will need to open the io.Reader,
 create a client, and call client.Parse.
