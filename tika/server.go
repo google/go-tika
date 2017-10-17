@@ -38,6 +38,7 @@ type Server struct {
 	jar  string
 	url  string // url is derived from port.
 	port string
+	cmd  *exec.Cmd
 }
 
 // URL returns the URL of this Server.
@@ -66,30 +67,29 @@ func NewServer(jar, port string) (*Server, error) {
 	return s, nil
 }
 
-var commandContext = exec.CommandContext
+var command = exec.Command
 
 // Start starts the given server. Start will start a new Java process. The
-// caller must call cancel() to shut down the process when finished with the
-// Server. The given Context is used for the Java process.
-func (s *Server) Start(ctx context.Context) (cancel func(), err error) {
-	ctx, cancel = context.WithCancel(ctx)
-	cmd := commandContext(ctx, "java", "-jar", s.jar, "-p", s.port)
+// caller must call Stop() to shut down the process when finished with the
+// Server. Start will wait for the server to be available or until ctx is
+// cancelled.
+func (s *Server) Start(ctx context.Context) error {
+	cmd := command("java", "-jar", s.jar, "-p", s.port)
 
 	if err := cmd.Start(); err != nil {
-		cancel()
-		return nil, err
+		return err
 	}
+	s.cmd = cmd
 
 	if err := s.waitForStart(ctx); err != nil {
-		cancel()
 		out, readErr := cmd.CombinedOutput()
 		if readErr != nil {
-			return nil, fmt.Errorf("error reading output: %v", readErr)
+			return fmt.Errorf("error reading output: %v", readErr)
 		}
 		// Report stderr since sometimes the server says why it failed to start.
-		return nil, fmt.Errorf("error starting server: %v\nserver stderr:\n\n%s", err, out)
+		return fmt.Errorf("error starting server: %v\nserver stderr:\n\n%s", err, out)
 	}
-	return cancel, nil
+	return nil
 }
 
 // waitForServer waits until the given Server is responding to requests or
@@ -108,6 +108,19 @@ func (s Server) waitForStart(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
+}
+
+// Stop shuts the server down, killing the underlying Java process. Stop
+// must be called when finished with the server to avoid leaking the
+// Java process. If s has not been started, Stop will panic.
+func (s *Server) Stop() error {
+	if err := s.cmd.Process.Kill(); err != nil {
+		return fmt.Errorf("could not kill server: %v", err)
+	}
+	if err := s.cmd.Wait(); err != nil {
+		return fmt.Errorf("could not wait for server to finish: %v", err)
+	}
+	return nil
 }
 
 func md5Hash(path string) (string, error) {

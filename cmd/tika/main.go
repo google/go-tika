@@ -103,11 +103,11 @@ func main() {
 			log.Fatal(err)
 		}
 
-		cancel, err = s.Start(context.Background())
+		err = s.Start(context.Background())
 		if err != nil {
 			log.Fatalf("could not start server: %v", err)
 		}
-		defer cancel()
+		defer s.Stop()
 
 		*serverURL = s.URL()
 	}
