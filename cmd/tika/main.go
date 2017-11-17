@@ -72,10 +72,21 @@ func main() {
 	action := flag.Arg(0)
 
 	if *downloadVersion != "" {
+		v := tika.Version116
+		switch *downloadVersion {
+		case "1.14":
+			v = tika.Version114
+		case "1.15":
+			v = tika.Version115
+		case "1.16":
+			v = tika.Version116
+		default:
+			log.Fatalf("unsupported server version: %q", *downloadVersion)
+		}
 		if *serverJAR == "" {
 			*serverJAR = "tika-server-" + *downloadVersion + ".jar"
 		}
-		err := tika.DownloadServer(context.Background(), tika.Version(*downloadVersion), *serverJAR)
+		err := tika.DownloadServer(context.Background(), v, *serverJAR)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -87,16 +98,16 @@ func main() {
 
 	var cancel func()
 	if *serverJAR != "" {
-		s, err := tika.NewServer(*serverJAR)
+		s, err := tika.NewServer(*serverJAR, "")
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		cancel, err = s.Start(context.Background())
+		err = s.Start(context.Background())
 		if err != nil {
 			log.Fatalf("could not start server: %v", err)
 		}
-		defer cancel()
+		defer s.Stop()
 
 		*serverURL = s.URL()
 	}

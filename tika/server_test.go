@@ -32,7 +32,7 @@ import (
 func init() {
 	// Overwrite the cmder to inject a dummy command. We simulate starting a server
 	// by running the TestHelperProcess.
-	cmder = func(context.Context, string, ...string) *exec.Cmd {
+	command = func(string, ...string) *exec.Cmd {
 		c := exec.Command(os.Args[0], "-test.run=TestHelperProcess", "--", "sleep", "2")
 		c.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
 		return c
@@ -40,28 +40,16 @@ func init() {
 }
 
 func TestNewServerError(t *testing.T) {
-	path, err := os.Executable() // Use the text executable path as a dummy jar.
-	if err != nil {
-		t.Skip("cannot find current test executable")
-	}
 	tests := []struct {
-		name    string
-		jar     string
-		options []Option
+		name string
+		jar  string
+		port string
 	}{
 		{name: "no jar path"},
-		{
-			name: "invalid jar path",
-			jar:  "/invalid/jar/path.jar",
-		},
-		{
-			name:    "invalid hostname",
-			jar:     path,
-			options: []Option{WithHostname("192.168.0.%31")},
-		},
+		{name: "invalid port", jar: "jar/path", port: "%31"},
 	}
 	for _, test := range tests {
-		if _, err := NewServer(test.jar, test.options...); err == nil {
+		if _, err := NewServer(test.jar, test.port); err == nil {
 			t.Errorf("NewServer(%s) got no error", test.name)
 		}
 	}
@@ -80,30 +68,16 @@ func TestStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating test server: %v", err)
 	}
-	tests := []struct {
-		name    string
-		options []Option
-	}{
-		{
-			name: "basic config",
-			options: []Option{
-				WithHostname(tsURL.Hostname()),
-				WithPort(tsURL.Port()),
-			},
-		},
+
+	s, err := NewServer(path, tsURL.Port())
+	if err != nil {
+		t.Fatalf("NewServer got error: %v", err)
 	}
-	for _, test := range tests {
-		s, err := NewServer(path, test.options...)
-		if err != nil {
-			t.Errorf("NewServer(%s) got error: %v", test.name, err)
-			continue
-		}
-		cancel, err := s.Start(context.Background())
-		if err != nil {
-			t.Errorf("Start(%s) got error: %v", test.name, err)
-		}
-		cancel()
+	err = s.Start(context.Background())
+	if err != nil {
+		t.Fatalf("Start got error: %v", err)
 	}
+	s.Stop()
 }
 
 func bouncyServer(bounce int) *httptest.Server {
@@ -130,31 +104,14 @@ func TestStartError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating test server: %v", err)
 	}
-	tests := []struct {
-		name    string
-		jar     string
-		options []Option
-	}{
-		{
-			name: "unresponsive server",
-			jar:  path,
-			options: []Option{
-				WithHostname(tsURL.Hostname()),
-				WithPort(tsURL.Port()),
-				WithStartupTimeout(2 * time.Second),
-			},
-		},
+	s, err := NewServer(path, tsURL.Port())
+	if err != nil {
+		t.Fatalf("NewServer got error: %v", err)
 	}
-	for _, test := range tests {
-		s, err := NewServer(test.jar, test.options...)
-		if err != nil {
-			t.Errorf("NewServer(%s) got error: %v", test.name, err)
-			continue
-		}
-		if cancel, err := s.Start(context.Background()); err == nil {
-			t.Errorf("s.Start(%s) got no error, want error", test.name)
-			cancel()
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := s.Start(ctx); err == nil {
+		t.Fatalf("s.Start got no error, want error")
 	}
 }
 
@@ -185,8 +142,10 @@ func TestWaitForStart(t *testing.T) {
 			t.Parallel()
 			ts := bouncyServer(test.reqToBounce)
 			defer ts.Close()
-			s := &Server{url: ts.URL, startupTimeout: test.timeout}
-			got := s.waitForStart(context.Background())
+			s := &Server{url: ts.URL}
+			ctx, cancel := context.WithTimeout(context.Background(), test.timeout)
+			defer cancel()
+			got := s.waitForStart(ctx)
 			if test.wantError && got == nil {
 				t.Errorf("waitForStart(%s) got no error, want error", test.name)
 			}
@@ -234,31 +193,27 @@ func TestValidateFileMD5(t *testing.T) {
 	}
 
 	tests := []struct {
-		path      string
-		md5String string
-		want      bool
+		path    string
+		wantErr bool
 	}{
-		{
-			"path_to_non_existent_file",
-			"does not match",
-			false,
-		},
-		{
-			path,
-			"does not match",
-			false,
-		},
+		{"path_to_non_existent_file", true},
+		{path, false},
 	}
 	for _, test := range tests {
-		if got, _ := validateFileMD5(test.path, test.md5String); got != test.want {
-			t.Errorf("validateFileMD5(%q, %q) = %t, want %t", test.path, test.md5String, got, test.want)
+		_, err := md5Hash(test.path)
+		if test.wantErr && err == nil {
+			t.Errorf("md5Hash(%s) wanted an error", test.path)
+			continue
+		}
+		if !test.wantErr && err != nil {
+			t.Errorf("md5Hash(%s) got an error: %v", test.path, err)
 		}
 	}
 }
 
 func TestDownloadServerError(t *testing.T) {
 	tests := []struct {
-		version Version
+		version version
 		path    string
 	}{
 		{"1.0", ""},
