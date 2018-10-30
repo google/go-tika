@@ -181,11 +181,25 @@ func (c *Client) LanguageString(ctx context.Context, input string) (string, erro
 
 // MetaRecursive parses the given input and all embedded documents. The result
 // is a list of maps from metadata key to value for each document. The content
-// of each document is in the XTIKAContent field. See ParseRecursive to just get
-// the content of each document. If the error is not nil, the result list is
-// undefined.
+// of each document is in the XTIKAContent field in text form. See
+// ParseRecursive to just get the content of each document. If the error is not
+// nil, the result list is undefined.
 func (c *Client) MetaRecursive(ctx context.Context, input io.Reader) ([]map[string][]string, error) {
-	body, err := c.call(ctx, input, "PUT", "/rmeta/text", nil)
+	return c.MetaRecursiveType(ctx, input, "text")
+}
+
+// MetaRecursiveType parses the given input and all embedded documents. The result
+// is a list of maps from metadata key to value for each document. The content
+// of each document is in the XTIKAContent field, and is of the type indicated
+// by the contentType parameter An empty string can be passed in for a default
+// type of XML. See ParseRecursive to just get the content of each document. If
+// the error is not nil, the result list is undefined.
+func (c *Client) MetaRecursiveType(ctx context.Context, input io.Reader, contentType string) ([]map[string][]string, error) {
+	path := "/rmeta"
+	if contentType != "" {
+		path = fmt.Sprintf("/rmeta/%s", contentType)
+	}
+	body, err := c.call(ctx, input, "PUT", path, nil)
 	if err != nil {
 		return nil, err
 	}
