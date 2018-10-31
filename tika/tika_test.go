@@ -18,6 +18,7 @@ package tika
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -243,6 +244,75 @@ func TestMetaRecursive(t *testing.T) {
 		}
 		if !reflect.DeepEqual(got, test.want) {
 			t.Errorf("MetaRecursive(%q) got %+v, want %+v", test.response, got, test.want)
+		}
+	}
+}
+func TestMetaRecursiveType(t *testing.T) {
+	const (
+		// Distilled forms of the X-TIKA:content in actual Tika responses.
+		xml    = `<meta name="k" content="v" /> example text`
+		text   = "example text"
+		html   = `<meta name="k" content="v"> example text`
+		ignore = ""
+	)
+	responsify := func(s string) []map[string][]string {
+		return []map[string][]string{
+			{"X-TIKA:content": {s}},
+		}
+	}
+	tikaify := func(s string) string {
+		data, err := json.Marshal(responsify(s))
+		if err != nil {
+			t.Errorf("error building response: %v", err)
+		}
+		return string(data)
+	}
+	tests := []struct {
+		typeParam string
+		want      []map[string][]string
+	}{
+		{
+			typeParam: "",
+			want:      responsify(xml),
+		},
+		{
+			typeParam: "text",
+			want:      responsify(text),
+		},
+		{
+			typeParam: "html",
+			want:      responsify(html),
+		},
+		{
+			typeParam: "ignore",
+			want:      responsify(ignore),
+		},
+	}
+	for _, test := range tests {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Mirrors the possibilities specified here:
+			// https://wiki.apache.org/tika/TikaJAXRS#Recursive_Metadata_and_Content
+			switch r.URL.Path {
+			case "/rmeta":
+				fmt.Fprint(w, tikaify(xml))
+			case "/rmeta/text":
+				fmt.Fprint(w, tikaify(text))
+			case "/rmeta/html":
+				fmt.Fprint(w, tikaify(html))
+			case "/rmeta/ignore":
+				fmt.Fprint(w, tikaify(ignore))
+			default:
+				panic("unrecognized path")
+			}
+		}))
+		defer ts.Close()
+		c := NewClient(nil, ts.URL)
+		got, err := c.MetaRecursiveType(context.Background(), nil, test.typeParam)
+		if err != nil {
+			t.Errorf("MetaRecursive returned an error: %v, want %v", err, test.want)
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("MetaRecursiveType(%q) got %+v, want %+v", test.typeParam, got, test.want)
 		}
 	}
 }
