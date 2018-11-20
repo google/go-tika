@@ -18,7 +18,7 @@ package tika
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto"
 	"fmt"
 	"io"
 	"net/url"
@@ -123,14 +123,14 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-func md5Hash(path string) (string, error) {
+func getHash(path string, alg crypto.Hash) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 
-	h := md5.New()
+	h := alg.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}
@@ -145,12 +145,21 @@ const (
 	Version114 version = "1.14"
 	Version115 version = "1.15"
 	Version116 version = "1.16"
+	Version117 version = "1.17"
+	Version118 version = "1.18"
+	Version119 version = "1.19"
 )
 
 var md5s = map[version]string{
 	Version114: "39055fc71358d774b9da066f80b1141c",
 	Version115: "80bd3f00f05326d5190466de27d593dd",
 	Version116: "6a549ce6ef6e186e019766059fd82fb2",
+	Version117: "788cf50d9e7ec3de0d66541e560fbe00",
+}
+
+var sha512s = map[version]string{
+	Version118: "e44e015590738592e5ed4d60d2360f54b4830e2a22eb8533d969582f90cce7984f93f3efbb53c14fd2c6f34bf4486b142a1ca2847d88f2270f89bec43955acb3",
+	Version119: "b9d087b38c22bc16b73e4c3d5f66c752e601efa6a82105572c6a2359e119c2442c6d5eaa5270c29d040ecace398b570d02fdd3b112b495775f67122066614a47",
 }
 
 // DownloadServer downloads and validates the given server version,
@@ -160,12 +169,16 @@ var md5s = map[version]string{
 // If the file already exists and has the correct MD5, DownloadServer will
 // do nothing.
 func DownloadServer(ctx context.Context, v version, path string) error {
-	hash := md5s[v]
+	hash := sha512s[v]
+	alg := crypto.SHA512
 	if hash == "" {
-		return fmt.Errorf("unsupported Tika version: %s", v)
+		hash = md5s[v]
+		if hash == "" {
+			return fmt.Errorf("unsupported Tika version: %s", v)
+		}
+		alg = crypto.MD5
 	}
-
-	if got, err := md5Hash(path); err == nil {
+	if got, err := getHash(path, alg); err == nil {
 		if got == hash {
 			return nil
 		}
@@ -187,16 +200,16 @@ func DownloadServer(ctx context.Context, v version, path string) error {
 		return fmt.Errorf("error saving download: %v", err)
 	}
 
-	h, err := md5Hash(path)
+	h, err := getHash(path, alg)
 
 	if err != nil {
 		return err
 	}
 	if h != hash {
 		if err := os.Remove(path); err != nil {
-			return fmt.Errorf("invalid md5: %s: error removing %s: %v", h, path, err)
+			return fmt.Errorf("invalid ckecksum: %s: error removing %s: %v", h, path, err)
 		}
-		return fmt.Errorf("invalid md5: %s", h)
+		return fmt.Errorf("invalid checksum: %s", h)
 	}
 	return nil
 }
