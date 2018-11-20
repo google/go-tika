@@ -54,12 +54,11 @@ const (
 
 // Command line flags.
 var (
-	downloadVersion = flag.String("download_version", "", "Tika Server JAR version to download. If -serverJAR is specified, it will be downloaded to that location, otherwise it will be downloaded to your working directory. If the JAR has already been downloaded and has the correct MD5, this will do nothing. Valid versions: 1.14.")
-	filename        = flag.String("filename", "", "Path to file to parse.")
-	metaField       = flag.String("field", "", `Specific field to get when using the "meta" action. Undefined when using the -recursive flag.`)
-	recursive       = flag.Bool("recursive", false, `Whether to run "parse" or "meta" recursively, returning a list with one element per embedded document. Undefined when using the -field flag.`)
-	serverJAR       = flag.String("server_jar", "", "Absolute path to the Tika Server JAR. This will start a new server, ignoring -serverURL.")
-	serverURL       = flag.String("server_url", "", "URL of Tika server.")
+	filename  = flag.String("filename", "", "Path to file to parse.")
+	metaField = flag.String("field", "", `Specific field to get when using the "meta" action. Undefined when using the -recursive flag.`)
+	recursive = flag.Bool("recursive", false, `Whether to run "parse" or "meta" recursively, returning a list with one element per embedded document. Undefined when using the -field flag.`)
+	serverJAR = flag.String("server_jar", "", "Absolute path to the Tika Server JAR. This will start a new server, ignoring -serverURL.")
+	serverURL = flag.String("server_url", "", "URL of Tika server.")
 )
 
 func main() {
@@ -71,25 +70,13 @@ func main() {
 	}
 	action := flag.Arg(0)
 
-	if *downloadVersion != "" {
-		v := tika.Version116
-		switch *downloadVersion {
-		case "1.14":
-			v = tika.Version114
-		case "1.15":
-			v = tika.Version115
-		case "1.16":
-			v = tika.Version116
-		default:
-			log.Fatalf("unsupported server version: %q", *downloadVersion)
-		}
-		if *serverJAR == "" {
-			*serverJAR = "tika-server-" + *downloadVersion + ".jar"
-		}
-		err := tika.DownloadServer(context.Background(), v, *serverJAR)
-		if err != nil {
-			log.Fatal(err)
-		}
+	v := tika.Version119
+	if *serverJAR == "" {
+		*serverJAR = "tika-server-" + string(v) + ".jar"
+	}
+	err := tika.DownloadServer(context.Background(), v, *serverJAR)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	if *serverURL == "" && *serverJAR == "" {

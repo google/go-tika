@@ -18,7 +18,6 @@ package tika
 
 import (
 	"context"
-	"crypto"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -201,7 +200,7 @@ func TestValidateFileHash(t *testing.T) {
 		{path, false},
 	}
 	for _, test := range tests {
-		_, err := getHash(test.path, crypto.MD5)
+		_, err := sha512Hash(test.path)
 		if test.wantErr && err == nil {
 			t.Errorf("getHash(%s) wanted an error", test.path)
 			continue
