@@ -186,7 +186,7 @@ func TestHelperProcess(*testing.T) {
 	}
 }
 
-func TestValidateFileMD5(t *testing.T) {
+func TestValidateFileHash(t *testing.T) {
 	path, err := os.Executable()
 	if err != nil {
 		t.Skip("cannot find current test executable")
@@ -200,13 +200,13 @@ func TestValidateFileMD5(t *testing.T) {
 		{path, false},
 	}
 	for _, test := range tests {
-		_, err := md5Hash(test.path)
+		_, err := sha512Hash(test.path)
 		if test.wantErr && err == nil {
-			t.Errorf("md5Hash(%s) wanted an error", test.path)
+			t.Errorf("getHash(%s) wanted an error", test.path)
 			continue
 		}
 		if !test.wantErr && err != nil {
-			t.Errorf("md5Hash(%s) got an error: %v", test.path, err)
+			t.Errorf("getHash(%s) got an error: %v", test.path, err)
 		}
 	}
 }

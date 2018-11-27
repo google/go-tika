@@ -54,7 +54,7 @@ const (
 
 // Command line flags.
 var (
-	downloadVersion = flag.String("download_version", "", "Tika Server JAR version to download. If -serverJAR is specified, it will be downloaded to that location, otherwise it will be downloaded to your working directory. If the JAR has already been downloaded and has the correct MD5, this will do nothing. Valid versions: 1.14.")
+	downloadVersion = flag.String("download_version", "", "Tika Server JAR version to download. If -serverJAR is specified, it will be downloaded to that location, otherwise it will be downloaded to your working directory. If the JAR has already been downloaded and has the correct MD5, this will do nothing. Valid versions: 1.19.")
 	filename        = flag.String("filename", "", "Path to file to parse.")
 	metaField       = flag.String("field", "", `Specific field to get when using the "meta" action. Undefined when using the -recursive flag.`)
 	recursive       = flag.Bool("recursive", false, `Whether to run "parse" or "meta" recursively, returning a list with one element per embedded document. Undefined when using the -field flag.`)
@@ -72,26 +72,21 @@ func main() {
 	action := flag.Arg(0)
 
 	if *downloadVersion != "" {
-		v := tika.Version116
+		v := tika.Version119
 		switch *downloadVersion {
-		case "1.14":
-			v = tika.Version114
-		case "1.15":
-			v = tika.Version115
-		case "1.16":
-			v = tika.Version116
+		case "1.19":
+			v = tika.Version119
 		default:
 			log.Fatalf("unsupported server version: %q", *downloadVersion)
 		}
 		if *serverJAR == "" {
-			*serverJAR = "tika-server-" + *downloadVersion + ".jar"
+			*serverJAR = "tika-server-" + string(v) + ".jar"
 		}
 		err := tika.DownloadServer(context.Background(), v, *serverJAR)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-
 	if *serverURL == "" && *serverJAR == "" {
 		log.Fatal("no URL specified: set serverURL, serverJAR and/or downloadVersion")
 	}
