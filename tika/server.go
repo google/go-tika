@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"time"
+	"strconv"
 
 	"golang.org/x/net/context/ctxhttp"
 )
@@ -39,6 +40,15 @@ type Server struct {
 	url  string // url is derived from port.
 	port string
 	cmd  *exec.Cmd
+	child *childOptions
+}
+
+type childOptions struct {
+	maxFiles string
+	taskPulseMillis string
+	taskTimeoutMillis string
+	pingPulseMillis string
+	pingTimeoutMillis string
 }
 
 // URL returns the URL of this Server.
@@ -67,6 +77,22 @@ func NewServer(jar, port string) (*Server, error) {
 	return s, nil
 }
 
+// ChildMode sets up the server to use the -spawnChild option
+// must be called before starting the server
+func (s *Server) ChildMode(maxfiles, taskpulse, tasktimeout, pingpulse, pingtimeout int) error {
+	if s.cmd != nil {
+		return fmt.Errorf("Server Process already started, cannot switch to spawn child mode")
+	}
+	co := new(childOptions)
+	co.maxFiles = strconv.Itoa(maxfiles)
+	co.taskPulseMillis = strconv.Itoa(taskpulse)
+	co.taskTimeoutMillis = strconv.Itoa(tasktimeout)
+	co.pingPulseMillis = strconv.Itoa(pingpulse)
+	co.pingTimeoutMillis = strconv.Itoa(pingtimeout)
+	s.child = co
+	return nil
+}
+
 var command = exec.Command
 
 // Start starts the given server. Start will start a new Java process. The
@@ -74,7 +100,12 @@ var command = exec.Command
 // Server. Start will wait for the server to be available or until ctx is
 // cancelled.
 func (s *Server) Start(ctx context.Context) error {
-	cmd := command("java", "-jar", s.jar, "-p", s.port)
+	var cmd *exec.Cmd
+	if s.child == nil {
+		cmd = command("java", "-jar", s.jar, "-p", s.port)
+	} else {
+		cmd = command("java", "-jar", s.jar, "-p", s.port, "-spawnChild", "-maxFiles", s.child.maxFiles, "-taskPulseMillis", s.child.taskPulseMillis, "-taskTimeoutMillis", s.child.taskTimeoutMillis, "-pingPulseMillis", s.child.pingPulseMillis, "-pingTimeoutMillis", s.child.pingTimeoutMillis)
+	}
 
 	if err := cmd.Start(); err != nil {
 		return err
@@ -119,6 +150,32 @@ func (s *Server) Stop() error {
 	}
 	if err := s.cmd.Wait(); err != nil {
 		return fmt.Errorf("could not wait for server to finish: %v", err)
+	}
+	return nil
+}
+
+// Shutdown attempts to close the server gracefully before using SIGKILL,
+// Stop() uses SIGKILL right away, which causes the kernal to stop the java process instantly.
+func (s *Server) Shutdown(ctx context.Context) error {
+	if err := s.cmd.Process.Signal(os.Interrupt); err != nil {
+		return fmt.Errorf("could not interrupt server: %v", err)
+	}
+	errchannel := make(chan error)
+	go func() {
+			select {
+			case errchannel <- s.cmd.Wait():
+			case <-ctx.Done():
+			}
+	}()
+	select {
+	case err := <-errchannel:
+		if err != nil {
+			return fmt.Errorf("could not wait for server to finish: %v", err)
+		}
+	case <-ctx.Done():
+		if err := s.cmd.Process.Kill(); err != nil {
+			return fmt.Errorf("could not kill server: %v", err)
+		}
 	}
 	return nil
 }
