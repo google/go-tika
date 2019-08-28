@@ -78,7 +78,7 @@ func NewServer(jar, port string) (*Server, error) {
 }
 
 // ChildMode sets up the server to use the -spawnChild option
-// must be called before starting the server
+// If used, ChildMode must be called before starting the server.
 func (s *Server) ChildMode(maxfiles, taskpulse, tasktimeout, pingpulse, pingtimeout int) error {
 	if s.cmd != nil {
 		return fmt.Errorf("Server Process already started, cannot switch to spawn child mode")
