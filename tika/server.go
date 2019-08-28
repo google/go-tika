@@ -83,7 +83,10 @@ func (s *Server) ChildMode(maxfiles, taskpulse, tasktimeout, pingpulse, pingtime
 	if s.cmd != nil {
 		return fmt.Errorf("Server Process already started, cannot switch to spawn child mode")
 	}
-	co := new(childOptions)
+	co := &childOptions{
+		maxFiles: strconv.Itoa(maxFiles),
+		// ...
+	}
 	co.maxFiles = strconv.Itoa(maxfiles)
 	co.taskPulseMillis = strconv.Itoa(taskpulse)
 	co.taskTimeoutMillis = strconv.Itoa(tasktimeout)
