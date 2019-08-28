@@ -40,15 +40,41 @@ type Server struct {
 	url  string // url is derived from port.
 	port string
 	cmd  *exec.Cmd
-	child *childOptions
+	child *ChildOptions
 }
 
-type childOptions struct {
-	maxFiles string
-	taskPulseMillis string
-	taskTimeoutMillis string
-	pingPulseMillis string
-	pingTimeoutMillis string
+// Command line parameters that can be used when tika is run with the -spawnChild option.
+// If field is 0 associated flag is not included.
+type ChildOptions struct {
+	MaxFiles int
+	TaskPulseMillis int
+	TaskTimeoutMillis int
+	PingPulseMillis int
+	PingTimeoutMillis int
+}
+
+func (co *ChildOptions) getArgs() []string {
+	if co == nil {
+		return []string{}
+	}
+	args := make([]string, 0, 11)
+	args = append(args, "-spawnChild")
+	if co.MaxFiles == -1 || co.MaxFiles > 0 {
+		args = append(args, "-maxFiles", strconv.Itoa(co.MaxFiles))
+	}
+	if co.TaskPulseMillis > 0 {
+		args = append(args, "-taskPulseMillis", strconv.Itoa(co.TaskPulseMillis))
+	}
+	if co.TaskTimeoutMillis > 0 {
+		args = append(args, "-taskTimeoutMillis", strconv.Itoa(co.TaskTimeoutMillis))
+	}
+	if co.PingPulseMillis > 0 {
+		args = append(args, "-pingPulseMillis", strconv.Itoa(co.PingPulseMillis))
+	}
+	if co.PingTimeoutMillis > 0 {
+		args = append(args, "-pingTimeoutMillis", strconv.Itoa(co.PingTimeoutMillis))
+	}
+	return args
 }
 
 // URL returns the URL of this Server.
@@ -77,22 +103,14 @@ func NewServer(jar, port string) (*Server, error) {
 	return s, nil
 }
 
-// ChildMode sets up the server to use the -spawnChild option
+// ChildMode sets up the server to use the -spawnChild option.
 // If used, ChildMode must be called before starting the server.
-func (s *Server) ChildMode(maxfiles, taskpulse, tasktimeout, pingpulse, pingtimeout int) error {
+// If you want to turn off the -spawnChild option, call Server.ChildMode(nil).
+func (s *Server) ChildMode(ops *ChildOptions) error {
 	if s.cmd != nil {
 		return fmt.Errorf("Server Process already started, cannot switch to spawn child mode")
 	}
-	co := &childOptions{
-		maxFiles: strconv.Itoa(maxFiles),
-		// ...
-	}
-	co.maxFiles = strconv.Itoa(maxfiles)
-	co.taskPulseMillis = strconv.Itoa(taskpulse)
-	co.taskTimeoutMillis = strconv.Itoa(tasktimeout)
-	co.pingPulseMillis = strconv.Itoa(pingpulse)
-	co.pingTimeoutMillis = strconv.Itoa(pingtimeout)
-	s.child = co
+	s.child = ops
 	return nil
 }
 
@@ -103,12 +121,7 @@ var command = exec.Command
 // Server. Start will wait for the server to be available or until ctx is
 // cancelled.
 func (s *Server) Start(ctx context.Context) error {
-	var cmd *exec.Cmd
-	if s.child == nil {
-		cmd = command("java", "-jar", s.jar, "-p", s.port)
-	} else {
-		cmd = command("java", "-jar", s.jar, "-p", s.port, "-spawnChild", "-maxFiles", s.child.maxFiles, "-taskPulseMillis", s.child.taskPulseMillis, "-taskTimeoutMillis", s.child.taskTimeoutMillis, "-pingPulseMillis", s.child.pingPulseMillis, "-pingTimeoutMillis", s.child.pingTimeoutMillis)
-	}
+	cmd := command("java", append([]string{"-jar", s.jar, "-p", s.port}, s.child.getArgs()...)...)
 
 	if err := cmd.Start(); err != nil {
 		return err
@@ -163,15 +176,15 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if err := s.cmd.Process.Signal(os.Interrupt); err != nil {
 		return fmt.Errorf("could not interrupt server: %v", err)
 	}
-	errchannel := make(chan error)
+	errChannel := make(chan error)
 	go func() {
 			select {
-			case errchannel <- s.cmd.Wait():
+			case errChannel <- s.cmd.Wait():
 			case <-ctx.Done():
 			}
 	}()
 	select {
-	case err := <-errchannel:
+	case err := <- errChannel:
 		if err != nil {
 			return fmt.Errorf("could not wait for server to finish: %v", err)
 		}
