@@ -55,7 +55,7 @@ type ChildOptions struct {
 
 func (co *ChildOptions) args() []string {
 	if co == nil {
-		return []string{}
+		return nil
 	}
 	args := []string{}
 	args = append(args, "-spawnChild")
@@ -121,7 +121,7 @@ var command = exec.Command
 // Server. Start will wait for the server to be available or until ctx is
 // cancelled.
 func (s *Server) Start(ctx context.Context) error {
-	cmd := command("java", append([]string{"-jar", s.jar, "-p", s.port}, s.child.getArgs()...)...)
+	cmd := command("java", append([]string{"-jar", s.jar, "-p", s.port}, s.child.args()...)...)
 
 	if err := cmd.Start(); err != nil {
 		return err
@@ -160,6 +160,8 @@ func (s Server) waitForStart(ctx context.Context) error {
 // Stop shuts the server down, killing the underlying Java process. Stop
 // must be called when finished with the server to avoid leaking the
 // Java process. If s has not been started, Stop will panic.
+// If not running in a Windows environment, it is recommended to use Shutdown
+// for a more graceful shutdown of the Java process.
 func (s *Server) Stop() error {
 	if err := s.cmd.Process.Kill(); err != nil {
 		return fmt.Errorf("could not kill server: %v", err)
