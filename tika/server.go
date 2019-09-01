@@ -108,7 +108,7 @@ func NewServer(jar, port string) (*Server, error) {
 // If you want to turn off the -spawnChild option, call Server.ChildMode(nil).
 func (s *Server) ChildMode(ops *ChildOptions) error {
 	if s.cmd != nil {
-		return fmt.Errorf("Server Process already started, cannot switch to spawn child mode")
+		return fmt.Errorf("server process already started, cannot switch to spawn child mode")
 	}
 	s.child = ops
 	return nil
