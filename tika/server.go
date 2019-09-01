@@ -43,7 +43,7 @@ type Server struct {
 	child *ChildOptions
 }
 
-// Command line parameters that can be used when tika is run with the -spawnChild option.
+// ChildOptions represent command line parameters that can be used when Tika is run with the -spawnChild option.
 // If a field is less than or equal to 0, the associated flag is not included.
 type ChildOptions struct {
 	MaxFiles int
