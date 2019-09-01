@@ -44,7 +44,7 @@ type Server struct {
 }
 
 // Command line parameters that can be used when tika is run with the -spawnChild option.
-// If field is 0 associated flag is not included.
+// If a field is less than or equal to 0, the associated flag is not included.
 type ChildOptions struct {
 	MaxFiles int
 	TaskPulseMillis int
