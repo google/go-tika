@@ -57,7 +57,7 @@ func (co *ChildOptions) args() []string {
 	if co == nil {
 		return []string{}
 	}
-	args := make([]string, 0, 11)
+	args := []string{}
 	args = append(args, "-spawnChild")
 	if co.MaxFiles == -1 || co.MaxFiles > 0 {
 		args = append(args, "-maxFiles", strconv.Itoa(co.MaxFiles))
