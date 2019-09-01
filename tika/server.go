@@ -53,7 +53,7 @@ type ChildOptions struct {
 	PingTimeoutMillis int
 }
 
-func (co *ChildOptions) getArgs() []string {
+func (co *ChildOptions) args() []string {
 	if co == nil {
 		return []string{}
 	}
