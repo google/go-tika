@@ -213,7 +213,7 @@ func TestValidateFileHash(t *testing.T) {
 
 func TestDownloadServerError(t *testing.T) {
 	tests := []struct {
-		version version
+		version Version
 		path    string
 	}{
 		{"1.0", ""},
