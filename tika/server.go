@@ -24,8 +24,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"time"
 	"strconv"
+	"time"
 
 	"golang.org/x/net/context/ctxhttp"
 )
@@ -36,20 +36,20 @@ import (
 // There is no need to create a Server for an already running Tika Server
 // since you can pass its URL directly to a Client.
 type Server struct {
-	jar  string
-	url  string // url is derived from port.
-	port string
-	cmd  *exec.Cmd
+	jar   string
+	url   string // url is derived from port.
+	port  string
+	cmd   *exec.Cmd
 	child *ChildOptions
 }
 
 // ChildOptions represent command line parameters that can be used when Tika is run with the -spawnChild option.
 // If a field is less than or equal to 0, the associated flag is not included.
 type ChildOptions struct {
-	MaxFiles int
-	TaskPulseMillis int
+	MaxFiles          int
+	TaskPulseMillis   int
 	TaskTimeoutMillis int
-	PingPulseMillis int
+	PingPulseMillis   int
 	PingTimeoutMillis int
 }
 
@@ -143,7 +143,7 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 //Starts the server as above with an additional argument to set an alternate temp location
-func (s *Server) StartWithAltTemp(ctx context.Context, tmp string) error {
+func (s *Server) StartWithAltTmp(ctx context.Context, tmp string) error {
 
 	if tmp == "" {
 		tmp = "/tmp"
@@ -215,13 +215,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 	errChannel := make(chan error)
 	go func() {
-			select {
-			case errChannel <- s.cmd.Wait():
-			case <-ctx.Done():
-			}
+		select {
+		case errChannel <- s.cmd.Wait():
+		case <-ctx.Done():
+		}
 	}()
 	select {
-	case err := <- errChannel:
+	case err := <-errChannel:
 		if err != nil {
 			return fmt.Errorf("could not wait for server to finish: %v", err)
 		}

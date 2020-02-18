@@ -80,6 +80,31 @@ func TestStart(t *testing.T) {
 	s.Stop()
 }
 
+func TestStartAltTMP(t *testing.T) {
+	path, err := os.Executable() // Use the text executable path as a dummy jar.
+	if err != nil {
+		t.Skip("cannot find current test executable")
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, "1.14")
+	}))
+	defer ts.Close()
+	tsURL, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatalf("error creating test server: %v", err)
+	}
+
+	s, err := NewServer(path, tsURL.Port())
+	if err != nil {
+		t.Fatalf("NewServer got error: %v", err)
+	}
+	err = s.StartWithAltTmp(context.Background(), ".")
+	if err != nil {
+		t.Fatalf("Start got error: %v", err)
+	}
+	s.Stop()
+}
+
 func bouncyServer(bounce int) *httptest.Server {
 	bounced := 0
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
