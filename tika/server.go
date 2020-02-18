@@ -90,10 +90,12 @@ func NewServer(jar, port string) (*Server, error) {
 	if port == "" {
 		port = "9998"
 	}
+
 	s := &Server{
 		jar:  jar,
 		port: port,
 	}
+
 	urlString := "http://localhost:" + s.port
 	u, err := url.Parse(urlString)
 	if err != nil {
@@ -121,7 +123,40 @@ var command = exec.Command
 // Server. Start will wait for the server to be available or until ctx is
 // cancelled.
 func (s *Server) Start(ctx context.Context) error {
+
 	cmd := command("java", append([]string{"-jar", s.jar, "-p", s.port}, s.child.args()...)...)
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	s.cmd = cmd
+
+	if err := s.waitForStart(ctx); err != nil {
+		out, readErr := cmd.CombinedOutput()
+		if readErr != nil {
+			return fmt.Errorf("error reading output: %v", readErr)
+		}
+		// Report stderr since sometimes the server says why it failed to start.
+		return fmt.Errorf("error starting server: %v\nserver stderr:\n\n%s", err, out)
+	}
+	return nil
+}
+
+//Starts the server as above with an additional argument to set an alternate temp location
+func (s *Server) StartWithAltTemp(ctx context.Context, tmp string) error {
+
+	if tmp == "" {
+		tmp = "/tmp"
+	}
+
+	//return an error if the provided tmp location does no exist
+	if _, err := os.Stat(tmp); os.IsNotExist(err) {
+		return err
+	}
+
+	tmpdir := fmt.Sprintf("-Djava.io.tmpdir=%s", tmp)
+
+	cmd := command("java", append([]string{tmpdir, "-jar", s.jar, "-p", s.port}, s.child.args()...)...)
 
 	if err := cmd.Start(); err != nil {
 		return err
