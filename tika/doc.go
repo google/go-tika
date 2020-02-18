@@ -43,6 +43,10 @@ If you don't have a running Tika Server, you can start one.
 	}
 	defer s.Stop()
 
+
+You can also start a Tika Server with a temporary workspace other than /tmp
+	err := s.StartWithAltTmp(context.Background(), "/content/tmp/tika/")
+
 To parse the contents of a file (or any io.Reader), you will need to open the io.Reader,
 create a client, and call client.Parse.
 
