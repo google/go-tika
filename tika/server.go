@@ -41,7 +41,7 @@ type Server struct {
 	port      string
 	cmd       *exec.Cmd
 	child     *ChildOptions
-	javaprops map[string]string
+	Javaprops map[string]string
 }
 
 // ChildOptions represent command line parameters that can be used when Tika is run with the -spawnChild option.
@@ -100,7 +100,11 @@ func NewServer(jar, port string) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid port %q: %v", s.port, err)
 	}
+
 	s.url = u.String()
+
+	s.Javaprops = make(map[string]string)
+
 	return s, nil
 }
 
@@ -112,29 +116,6 @@ func (s *Server) ChildMode(ops *ChildOptions) error {
 		return fmt.Errorf("server process already started, cannot switch to spawn child mode")
 	}
 	s.child = ops
-	return nil
-}
-
-// AddJavaProp adds a key value pair to the javaprops map that are added to the Cmd during Start()
-// If used, ChildMode must be called before starting the server.
-
-func (s *Server) AddJavaProp(k string, v string) error {
-
-	if s.cmd != nil {
-		return fmt.Errorf("server process already started, cannot set Java system properties")
-	}
-
-	var m map[string]string
-
-	if (len(s.javaprops)) < 1 {
-		m = make(map[string]string)
-	} else {
-		m = s.javaprops
-	}
-
-	m[k] = v
-	s.javaprops = m
-
 	return nil
 }
 
@@ -151,9 +132,9 @@ func (s *Server) Start(ctx context.Context) error {
 	//Check to see if there are any tuples in the servers java props, if so
 	//format and add to the props variable
 
-	if len(s.javaprops) > 0 {
-		for i := range s.javaprops {
-			props = fmt.Sprintf("-D%s=%s ", i, s.javaprops[i])
+	if len(s.Javaprops) > 0 {
+		for i := range s.Javaprops {
+			props = fmt.Sprintf("-D%s=%s ", i, s.Javaprops[i])
 		}
 	}
 
