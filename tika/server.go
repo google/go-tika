@@ -24,8 +24,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"time"
 	"strconv"
+	"time"
 
 	"golang.org/x/net/context/ctxhttp"
 )
@@ -36,20 +36,21 @@ import (
 // There is no need to create a Server for an already running Tika Server
 // since you can pass its URL directly to a Client.
 type Server struct {
-	jar  string
-	url  string // url is derived from port.
-	port string
-	cmd  *exec.Cmd
-	child *ChildOptions
+	jar       string
+	url       string // url is derived from port.
+	port      string
+	cmd       *exec.Cmd
+	child     *ChildOptions
+	javaprops map[string]string
 }
 
 // ChildOptions represent command line parameters that can be used when Tika is run with the -spawnChild option.
 // If a field is less than or equal to 0, the associated flag is not included.
 type ChildOptions struct {
-	MaxFiles int
-	TaskPulseMillis int
+	MaxFiles          int
+	TaskPulseMillis   int
 	TaskTimeoutMillis int
-	PingPulseMillis int
+	PingPulseMillis   int
 	PingTimeoutMillis int
 }
 
@@ -114,6 +115,29 @@ func (s *Server) ChildMode(ops *ChildOptions) error {
 	return nil
 }
 
+// AddJavaProp adds a key value pair to the javaprops map that are added to the Cmd during Start()
+// If used, ChildMode must be called before starting the server.
+
+func (s *Server) AddJavaProp(k string, v string) error {
+
+	if s.cmd != nil {
+		return fmt.Errorf("server process already started, cannot set Java system properties")
+	}
+
+	var m map[string]string
+
+	if (len(s.javaprops)) < 1 {
+		m = make(map[string]string)
+	} else {
+		m = s.javaprops
+	}
+
+	m[k] = v
+	s.javaprops = m
+
+	return nil
+}
+
 var command = exec.Command
 
 // Start starts the given server. Start will start a new Java process. The
@@ -121,7 +145,19 @@ var command = exec.Command
 // Server. Start will wait for the server to be available or until ctx is
 // cancelled.
 func (s *Server) Start(ctx context.Context) error {
-	cmd := command("java", append([]string{"-jar", s.jar, "-p", s.port}, s.child.args()...)...)
+
+	var props = ""
+
+	//Check to see if there are any tuples in the servers java props, if so
+	//format and add to the props variable
+
+	if len(s.javaprops) > 0 {
+		for i := range s.javaprops {
+			props = fmt.Sprintf("-D%s=%s ", i, s.javaprops[i])
+		}
+	}
+
+	cmd := command("java", append([]string{props, "-jar", s.jar, "-p", s.port}, s.child.args()...)...)
 
 	if err := cmd.Start(); err != nil {
 		return err
@@ -180,13 +216,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 	errChannel := make(chan error)
 	go func() {
-			select {
-			case errChannel <- s.cmd.Wait():
-			case <-ctx.Done():
-			}
+		select {
+		case errChannel <- s.cmd.Wait():
+		case <-ctx.Done():
+		}
 	}()
 	select {
-	case err := <- errChannel:
+	case err := <-errChannel:
 		if err != nil {
 			return fmt.Errorf("could not wait for server to finish: %v", err)
 		}

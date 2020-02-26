@@ -224,3 +224,49 @@ func TestDownloadServerError(t *testing.T) {
 		}
 	}
 }
+
+func TestAddJavaProps(t *testing.T) {
+	path, err := os.Executable() // Use the text executable path as a dummy jar.
+	if err != nil {
+		t.Skip("cannot find current test executable")
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, "1.14")
+	}))
+	defer ts.Close()
+	tsURL, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatalf("error creating test server: %v", err)
+	}
+
+	s, err := NewServer(path, tsURL.Port())
+	if err != nil {
+		t.Fatalf("NewServer got error: %v", err)
+	}
+
+	err = s.AddJavaProp("foo", "bar")
+	if err != nil {
+		t.Error(err)
+	}
+
+	want := 1
+	got := len(s.javaprops)
+
+	if got != want {
+		t.Errorf("wanted %d, got %d", want, got)
+	}
+
+	err = s.AddJavaProp("bar", "baz")
+	if err != nil {
+		t.Error(err)
+	}
+
+	want = 2
+	got = len(s.javaprops)
+	if got != want {
+		t.Errorf("wanted %d, got %d", want, got)
+	}
+
+	defer s.Stop()
+	s.Start(context.Background())
+}
