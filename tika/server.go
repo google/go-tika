@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context/ctxhttp"
@@ -41,7 +42,7 @@ type Server struct {
 	port      string
 	cmd       *exec.Cmd
 	child     *ChildOptions
-	Javaprops map[string]string
+	JavaProps map[string]string
 }
 
 // ChildOptions represent command line parameters that can be used when Tika is run with the -spawnChild option.
@@ -91,20 +92,19 @@ func NewServer(jar, port string) (*Server, error) {
 	if port == "" {
 		port = "9998"
 	}
+	javaProps := make(map[string]string)
+
 	s := &Server{
-		jar:  jar,
-		port: port,
+		jar:       jar,
+		port:      port,
+		JavaProps: javaProps,
 	}
 	urlString := "http://localhost:" + s.port
 	u, err := url.Parse(urlString)
 	if err != nil {
 		return nil, fmt.Errorf("invalid port %q: %v", s.port, err)
 	}
-
 	s.url = u.String()
-
-	s.Javaprops = make(map[string]string)
-
 	return s, nil
 }
 
@@ -127,18 +127,13 @@ var command = exec.Command
 // cancelled.
 func (s *Server) Start(ctx context.Context) error {
 
-	var props = ""
-
-	//Check to see if there are any tuples in the servers java props, if so
-	//format and add to the props variable
-
-	if len(s.Javaprops) > 0 {
-		for i := range s.Javaprops {
-			props = fmt.Sprintf("-D%s=%s ", i, s.Javaprops[i])
-		}
+	props := []string{}
+	for k, v := range s.JavaProps {
+		props = append(props, fmt.Sprintf("-D%s=%s", k, v))
 	}
+	propsArgs := strings.Join(props, " ")
 
-	cmd := command("java", append([]string{props, "-jar", s.jar, "-p", s.port}, s.child.args()...)...)
+	cmd := command("java", append([]string{propsArgs, "-jar", s.jar, "-p", s.port}, s.child.args()...)...)
 
 	if err := cmd.Start(); err != nil {
 		return err
