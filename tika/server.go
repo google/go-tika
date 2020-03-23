@@ -41,7 +41,7 @@ type Server struct {
 	port      string
 	cmd       *exec.Cmd
 	child     *ChildOptions
-	javaprops map[string]string
+	JavaProps map[string]string
 }
 
 // ChildOptions represent command line parameters that can be used when Tika is run with the -spawnChild option.
@@ -126,14 +126,15 @@ func (s *Server) AddJavaProp(k string, v string) error {
 
 	var m map[string]string
 
-	if (len(s.javaprops)) < 1 {
+	if (len(s.JavaProps)) < 1 {
 		m = make(map[string]string)
 	} else {
-		m = s.javaprops
+		m = s.JavaProps
 	}
 
 	m[k] = v
-	s.javaprops = m
+
+	s.JavaProps = m
 
 	return nil
 }
@@ -150,11 +151,8 @@ func (s *Server) Start(ctx context.Context) error {
 
 	//Check to see if there are any tuples in the servers java props, if so
 	//format and add to the props variable
-
-	if len(s.javaprops) > 0 {
-		for i := range s.javaprops {
-			props = fmt.Sprintf("-D%s=%s ", i, s.javaprops[i])
-		}
+	for i := range s.JavaProps {
+		props = fmt.Sprintf("-D%s=%s ", i, s.JavaProps[i])
 	}
 
 	cmd := command("java", append([]string{props, "-jar", s.jar, "-p", s.port}, s.child.args()...)...)

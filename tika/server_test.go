@@ -250,7 +250,7 @@ func TestAddJavaProps(t *testing.T) {
 	}
 
 	want := 1
-	got := len(s.javaprops)
+	got := len(s.JavaProps)
 
 	if got != want {
 		t.Errorf("wanted %d, got %d", want, got)
@@ -262,7 +262,7 @@ func TestAddJavaProps(t *testing.T) {
 	}
 
 	want = 2
-	got = len(s.javaprops)
+	got = len(s.JavaProps)
 	if got != want {
 		t.Errorf("wanted %d, got %d", want, got)
 	}
