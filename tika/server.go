@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context/ctxhttp"
@@ -91,9 +92,12 @@ func NewServer(jar, port string) (*Server, error) {
 	if port == "" {
 		port = "9998"
 	}
+	javaProps := make(map[string]string)
+
 	s := &Server{
-		jar:  jar,
-		port: port,
+		jar:       jar,
+		port:      port,
+		JavaProps: javaProps,
 	}
 	urlString := "http://localhost:" + s.port
 	u, err := url.Parse(urlString)
@@ -115,30 +119,6 @@ func (s *Server) ChildMode(ops *ChildOptions) error {
 	return nil
 }
 
-// AddJavaProp adds a key value pair to the javaprops map that are added to the Cmd during Start()
-// If used, ChildMode must be called before starting the server.
-
-func (s *Server) AddJavaProp(k string, v string) error {
-
-	if s.cmd != nil {
-		return fmt.Errorf("server process already started, cannot set Java system properties")
-	}
-
-	var m map[string]string
-
-	if (len(s.JavaProps)) < 1 {
-		m = make(map[string]string)
-	} else {
-		m = s.JavaProps
-	}
-
-	m[k] = v
-
-	s.JavaProps = m
-
-	return nil
-}
-
 var command = exec.Command
 
 // Start starts the given server. Start will start a new Java process. The
@@ -147,15 +127,13 @@ var command = exec.Command
 // cancelled.
 func (s *Server) Start(ctx context.Context) error {
 
-	var props = ""
-
-	//Check to see if there are any tuples in the servers java props, if so
-	//format and add to the props variable
-	for i := range s.JavaProps {
-		props = fmt.Sprintf("-D%s=%s ", i, s.JavaProps[i])
+	props := []string{}
+	for k, v := range s.JavaProps {
+		props = append(props, fmt.Sprintf("-D%s=%s", k, v))
 	}
+	propsArgs := strings.Join(props, " ")
 
-	cmd := command("java", append([]string{props, "-jar", s.jar, "-p", s.port}, s.child.args()...)...)
+	cmd := command("java", append([]string{propsArgs, "-jar", s.jar, "-p", s.port}, s.child.args()...)...)
 
 	if err := cmd.Start(); err != nil {
 		return err

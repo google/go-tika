@@ -244,29 +244,20 @@ func TestAddJavaProps(t *testing.T) {
 		t.Fatalf("NewServer got error: %v", err)
 	}
 
-	err = s.AddJavaProp("foo", "bar")
-	if err != nil {
-		t.Error(err)
+	want := "/tmp/stuff"
+	want2 := "Bar"
+
+	s.JavaProps["java.io.tmpdir"] = want
+	s.JavaProps["Foo"] = want2
+
+	got := s.JavaProps["java.io.tmpdir"]
+	got2 := s.JavaProps["Foo"]
+
+	if want != got {
+		t.Fatalf("Wanted: %s, Got: %s", want, got)
 	}
 
-	want := 1
-	got := len(s.JavaProps)
-
-	if got != want {
-		t.Errorf("wanted %d, got %d", want, got)
+	if want2 != got2 {
+		t.Fatalf("Wanted: %s, Got: %s", want2, got2)
 	}
-
-	err = s.AddJavaProp("bar", "baz")
-	if err != nil {
-		t.Error(err)
-	}
-
-	want = 2
-	got = len(s.JavaProps)
-	if got != want {
-		t.Errorf("wanted %d, got %d", want, got)
-	}
-
-	defer s.Stop()
-	s.Start(context.Background())
 }
