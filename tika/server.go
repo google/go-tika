@@ -36,6 +36,9 @@ import (
 // from Start.
 // There is no need to create a Server for an already running Tika Server
 // since you can pass its URL directly to a Client.
+// Additional Java system properties can be added to a Taka Server before
+// startup by adding to the JavaProps map
+
 type Server struct {
 	jar       string
 	url       string // url is derived from port.
@@ -131,9 +134,8 @@ func (s *Server) Start(ctx context.Context) error {
 	for k, v := range s.JavaProps {
 		props = append(props, fmt.Sprintf("-D%s=%s", k, v))
 	}
-	propsArgs := strings.Join(props, " ")
 
-	cmd := command("java", append([]string{propsArgs, "-jar", s.jar, "-p", s.port}, s.child.args()...)...)
+	cmd := command("java", append([]string{strings.Join(props, " "), "-jar", s.jar, "-p", s.port}, s.child.args()...)...)
 
 	if err := cmd.Start(); err != nil {
 		return err
