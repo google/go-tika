@@ -1,4 +1,4 @@
-module github.com/nyudlts/go-tika
+module github.com/google/go-tika
 
 go 1.11
 
