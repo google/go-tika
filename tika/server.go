@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 	"time"
 
 	"golang.org/x/net/context/ctxhttp"
@@ -130,12 +129,14 @@ var command = exec.Command
 // cancelled.
 func (s *Server) Start(ctx context.Context) error {
 
+	//create a slice of Java system properties to be passed to the JVM
 	props := []string{}
 	for k, v := range s.JavaProps {
-		props = append(props, fmt.Sprintf("-D%s=%s", k, v))
+		props = append(props, fmt.Sprintf("-D%s=\"%s\"", k, v))
 	}
 
-	cmd := command("java", append([]string{strings.Join(props, " "), "-jar", s.jar, "-p", s.port}, s.child.args()...)...)
+	args := append(append(props, "-jar", s.jar, "-p", s.port), s.child.args()...)
+	cmd := command("java", args...)
 
 	if err := cmd.Start(); err != nil {
 		return err
