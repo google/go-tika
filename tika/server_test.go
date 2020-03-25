@@ -228,3 +228,40 @@ func TestDownloadServerError(t *testing.T) {
 		}
 	}
 }
+
+func TestAddJavaProps(t *testing.T) {
+	path, err := os.Executable() // Use the text executable path as a dummy jar.
+	if err != nil {
+		t.Skip("cannot find current test executable")
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, "1.14")
+	}))
+	defer ts.Close()
+	tsURL, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatalf("error creating test server: %v", err)
+	}
+
+	s, err := NewServer(path, tsURL.Port())
+	if err != nil {
+		t.Fatalf("NewServer got error: %v", err)
+	}
+
+	want := "/tmp/stuff"
+	want2 := "Bar"
+
+	s.JavaProps["java.io.tmpdir"] = want
+	s.JavaProps["Foo"] = want2
+
+	got := s.JavaProps["java.io.tmpdir"]
+	got2 := s.JavaProps["Foo"]
+
+	if want != got {
+		t.Fatalf("Wanted: %s, Got: %s", want, got)
+	}
+
+	if want2 != got2 {
+		t.Fatalf("Wanted: %s, Got: %s", want2, got2)
+	}
+}

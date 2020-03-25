@@ -35,12 +35,16 @@ import (
 // from Start.
 // There is no need to create a Server for an already running Tika Server
 // since you can pass its URL directly to a Client.
+// Additional Java system properties can be added to a Taka Server before
+// startup by adding to the JavaProps map
+
 type Server struct {
-	jar   string
-	url   string // url is derived from port.
-	port  string
-	cmd   *exec.Cmd
-	child *ChildOptions
+	jar       string
+	url       string // url is derived from port.
+	port      string
+	cmd       *exec.Cmd
+	child     *ChildOptions
+	JavaProps map[string]string
 }
 
 // ChildOptions represent command line parameters that can be used when Tika is run with the -spawnChild option.
@@ -90,9 +94,12 @@ func NewServer(jar, port string) (*Server, error) {
 	if port == "" {
 		port = "9998"
 	}
+	javaProps := make(map[string]string)
+
 	s := &Server{
-		jar:  jar,
-		port: port,
+		jar:       jar,
+		port:      port,
+		JavaProps: javaProps,
 	}
 	urlString := "http://localhost:" + s.port
 	u, err := url.Parse(urlString)
@@ -125,6 +132,15 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	}
 	cmd := command("java", append([]string{"-jar", s.jar, "-p", s.port}, s.child.args()...)...)
+
+	//create a slice of Java system properties to be passed to the JVM
+	props := []string{}
+	for k, v := range s.JavaProps {
+		props = append(props, fmt.Sprintf("-D%s=\"%s\"", k, v))
+	}
+
+	args := append(append(props, "-jar", s.jar, "-p", s.port), s.child.args()...)
+	cmd := command("java", args...)
 
 	if err := cmd.Start(); err != nil {
 		return err
