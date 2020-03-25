@@ -131,8 +131,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if _, err := os.Stat(s.jar); os.IsNotExist(err) {
 		return err
 	}
-	cmd := command("java", append([]string{"-jar", s.jar, "-p", s.port}, s.child.args()...)...)
-
+	
 	//create a slice of Java system properties to be passed to the JVM
 	props := []string{}
 	for k, v := range s.JavaProps {
