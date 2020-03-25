@@ -94,19 +94,20 @@ func NewServer(jar, port string) (*Server, error) {
 	if port == "" {
 		port = "9998"
 	}
-	javaProps := make(map[string]string)
+
+	urlString := "http://localhost:" + port
+	u, err := url.Parse(urlString)
+	if err != nil {
+		return nil, fmt.Errorf("invalid port %q: %v", port, err)
+	}
 
 	s := &Server{
 		jar:       jar,
 		port:      port,
-		JavaProps: javaProps,
+		url:       u.String(),
+		JavaProps: map[string]string{},
 	}
-	urlString := "http://localhost:" + s.port
-	u, err := url.Parse(urlString)
-	if err != nil {
-		return nil, fmt.Errorf("invalid port %q: %v", s.port, err)
-	}
-	s.url = u.String()
+
 	return s, nil
 }
 
@@ -131,11 +132,11 @@ func (s *Server) Start(ctx context.Context) error {
 	if _, err := os.Stat(s.jar); os.IsNotExist(err) {
 		return err
 	}
-	
-	//create a slice of Java system properties to be passed to the JVM
+
+	// Create a slice of Java system properties to be passed to the JVM.
 	props := []string{}
 	for k, v := range s.JavaProps {
-		props = append(props, fmt.Sprintf("-D%s=\"%s\"", k, v))
+		props = append(props, fmt.Sprintf("-D%s=%q", k, v))
 	}
 
 	args := append(append(props, "-jar", s.jar, "-p", s.port), s.child.args()...)

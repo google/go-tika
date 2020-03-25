@@ -230,6 +230,9 @@ func TestDownloadServerError(t *testing.T) {
 }
 
 func TestAddJavaProps(t *testing.T) {
+	oldCommand := command
+	defer func() { command = oldCommand }()
+
 	path, err := os.Executable() // Use the text executable path as a dummy jar.
 	if err != nil {
 		t.Skip("cannot find current test executable")
@@ -248,20 +251,25 @@ func TestAddJavaProps(t *testing.T) {
 		t.Fatalf("NewServer got error: %v", err)
 	}
 
-	want := "/tmp/stuff"
-	want2 := "Bar"
+	wantKey := "java.io.tmpdir"
+	wantVal := "/tmp/stuff"
+	s.JavaProps[wantKey] = wantVal
 
-	s.JavaProps["java.io.tmpdir"] = want
-	s.JavaProps["Foo"] = want2
-
-	got := s.JavaProps["java.io.tmpdir"]
-	got2 := s.JavaProps["Foo"]
-
-	if want != got {
-		t.Fatalf("Wanted: %s, Got: %s", want, got)
+	command = func(c string, args ...string) *exec.Cmd {
+		found := false
+		want := fmt.Sprintf("-D%s=%q", wantKey, wantVal)
+		for _, arg := range args {
+			if arg == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("NewServer got %v %v args, want to contain %s", c, args, want)
+		}
+		return oldCommand(c, args...)
 	}
 
-	if want2 != got2 {
-		t.Fatalf("Wanted: %s, Got: %s", want2, got2)
+	if err := s.Start(context.Background()); err != nil {
+		t.Errorf("Start got error: %v", err)
 	}
 }
