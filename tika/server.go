@@ -128,7 +128,10 @@ var command = exec.Command
 // Server. Start will wait for the server to be available or until ctx is
 // cancelled.
 func (s *Server) Start(ctx context.Context) error {
-
+	if _, err := os.Stat(s.jar); os.IsNotExist(err) {
+		return err
+	}
+	
 	//create a slice of Java system properties to be passed to the JVM
 	props := []string{}
 	for k, v := range s.JavaProps {

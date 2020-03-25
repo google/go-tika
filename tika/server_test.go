@@ -113,6 +113,10 @@ func TestStartError(t *testing.T) {
 	if err := s.Start(ctx); err == nil {
 		t.Fatalf("s.Start got no error, want error")
 	}
+	s.jar = "nonexistentFile.jar"
+	if err := s.Start(ctx); err == nil {
+		t.Fatalf("s.Start got no error, want error for missing Jar file")
+	}
 }
 
 func TestURL(t *testing.T) {
