@@ -42,6 +42,8 @@ This library is distributed under the Apache V2 License. See the [LICENSE](./LIC
 
 Please see the [CONTRIBUTING.md](./CONTRIBUTING.md) file.
 
+Use `goimports` to format code and make sure the `go.mod`/`go.sum` files are up to date with `go mod tidy`.
+
 ## Disclaimer
 
 This is not an official Google product.
