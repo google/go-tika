@@ -4,11 +4,16 @@ on:
     branches:
       - master
   pull_request:
-  repository_dispatch:
+    branches:
+      - master
     types:
-      - autoformat
+      - labeled
+      - opened
+      - synchronize
+      - reopened
 jobs:
   lint:
+    if: github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'trigger-ci')
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
@@ -29,7 +34,20 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             exit 1
           fi
+      - name: Remove trigger-ci label if needed
+        uses: actions/github-script@v2
+        if: contains( github.event.pull_request.labels.*.name, 'trigger-ci')
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              name: 'trigger-ci'
+            })
   test:
+    if: github.event_name != 'labeled' || contains( github.event.pull_request.labels.*.name, 'trigger-ci')
     runs-on: ubuntu-latest
     steps:
       - name: Install Go

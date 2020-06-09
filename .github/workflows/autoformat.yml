@@ -6,7 +6,7 @@ on:
 jobs:
   autoformat:
     runs-on: ubuntu-latest
-    if: contains( github.event.pull_request.labels.*.name, 'autoformat')
+    if: contains(github.event.pull_request.labels.*.name, 'autoformat')
     steps:
       - name: Install Go
         uses: actions/setup-go@v2
@@ -44,13 +44,3 @@ jobs:
               issue_number: context.issue.number,
               name: 'autoformat'
             })
-      - name: Trigger lint and test
-        uses: actions/github-script@v2
-        with:
-          github-token: ${{secrets.FORMAT_TOKEN}}
-          script: |
-            github.repos.createDispatchEvent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              event_type: 'autoformat'
-            });
