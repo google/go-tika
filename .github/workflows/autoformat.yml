@@ -23,7 +23,6 @@ jobs:
       - name: Commit changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # TODO: check this is not a fork.
         run: |
           git config user.name tbpg
           git config user.email 26876514+tbpg@users.noreply.github.com
