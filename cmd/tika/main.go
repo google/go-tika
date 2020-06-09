@@ -72,7 +72,7 @@ func main() {
 	action := flag.Arg(0)
 
 	if *downloadVersion != "" {
-		v := tika.Versions[len(tika.Versions) - 1]
+		v := tika.Versions[len(tika.Versions)-1]
 		supported := false
 		for _, sv := range tika.Versions {
 			if tika.Version(*downloadVersion) == sv {
