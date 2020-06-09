@@ -24,12 +24,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name tbpg
-          git config user.email 26876514+tbpg@users.noreply.github.com
+          git config user.name yoshi-automation
+          git config user.email yoshi-automation@google.com
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
           git add .
           if [ -n "$(git status --porcelain)" ]; then
-            git commit --author "tbpg[bot] <26876514+tbpg@users.noreply.github.com>" --message "Run goimports and go mod tidy"
+            git commit --author "yoshi-automation <yoshi-automation@google.com>" --message "Run goimports and go mod tidy"
             git push
           fi
       - name: Remove autoformat label
