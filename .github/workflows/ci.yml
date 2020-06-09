@@ -1,0 +1,59 @@
+name: Continuous Integration
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+    types:
+      - labeled
+      - opened
+      - synchronize
+      - reopened
+jobs:
+  lint:
+    if: github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'trigger-ci')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '^1.14'
+      - name: Install goimports
+        run: go get golang.org/x/tools/cmd/goimports
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - run: goimports -w .
+      - run: go mod tidy
+      # If there are any diffs from goimports or go mod tidy, fail.
+      - name: Verify no changes from goimports and go mod tidy
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            exit 1
+          fi
+      - name: Remove trigger-ci label if needed
+        uses: actions/github-script@v2
+        if: contains( github.event.pull_request.labels.*.name, 'trigger-ci')
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              name: 'trigger-ci'
+            })
+  test:
+    if: github.event_name != 'labeled' || contains( github.event.pull_request.labels.*.name, 'trigger-ci')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '^1.14'
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - run: go test ./...
