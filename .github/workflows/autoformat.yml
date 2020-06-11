@@ -22,7 +22,7 @@ jobs:
       - run: go mod tidy
       - name: Commit changes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.FORMAT_TOKEN }}
         run: |
           git config user.name yoshi-automation
           git config user.email yoshi-automation@google.com
@@ -35,7 +35,7 @@ jobs:
       - name: Remove autoformat label
         uses: actions/github-script@v2
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
+          github-token: ${{secrets.FORMAT_TOKEN}}
           script: |
             github.issues.removeLabel({
               owner: context.repo.owner,
