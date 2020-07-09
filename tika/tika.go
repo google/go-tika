@@ -29,6 +29,16 @@ import (
 	"golang.org/x/net/context/ctxhttp"
 )
 
+// TikaError represents an error response from the Tika server.
+type TikaError struct {
+	// StatusCode is the http status code returned by the Tika server.
+	StatusCode int
+}
+
+func (e TikaError) Error() string {
+	return fmt.Sprintf("response code %d", e.StatusCode)
+}
+
 // Client represents a connection to a Tika Server.
 type Client struct {
 	// url is the URL of the Tika Server, including the port (if necessary), but
@@ -107,7 +117,7 @@ func (c *Client) call(ctx context.Context, input io.Reader, method, path string,
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response code %v", resp.StatusCode)
+		return nil, TikaError{resp.StatusCode}
 	}
 	return ioutil.ReadAll(resp.Body)
 }

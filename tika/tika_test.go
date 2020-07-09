@@ -19,6 +19,7 @@ package tika
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -75,8 +76,9 @@ func TestParse(t *testing.T) {
 
 func TestParseRecursive(t *testing.T) {
 	tests := []struct {
-		response string
-		want     []string
+		response   string
+		want       []string
+		statusCode int
 	}{
 		{
 			response: `[{"X-TIKA:content":"test 1"}]`,
@@ -93,16 +95,34 @@ func TestParseRecursive(t *testing.T) {
 		{
 			response: `[]`,
 		},
+		{
+			statusCode: http.StatusUnprocessableEntity,
+		},
 	}
 	for _, test := range tests {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			fmt.Fprint(w, test.response)
+			if test.statusCode != 0 {
+				w.WriteHeader(test.statusCode)
+			} else {
+				fmt.Fprint(w, test.response)
+			}
 		}))
 		defer ts.Close()
 		c := NewClient(nil, ts.URL)
 		got, err := c.ParseRecursive(context.Background(), nil)
 		if err != nil {
-			t.Errorf("ParseRecursive returned an error: %v, want %v", err, test.want)
+			if test.statusCode != 0 {
+				var tikaErr TikaError
+				if errors.As(err, &tikaErr) {
+					if tikaErr.StatusCode != test.statusCode {
+						t.Errorf("ParseRecursive expected status code %d, got %d", test.statusCode, tikaErr.StatusCode)
+					}
+				} else {
+					t.Errorf("ParseRecursive expected TikaError, got %T", err)
+				}
+			} else {
+				t.Errorf("ParseRecursive returned an error: %v, want %v", err, test.want)
+			}
 			continue
 		}
 		if !reflect.DeepEqual(got, test.want) {
