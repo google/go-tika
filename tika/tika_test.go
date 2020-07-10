@@ -112,7 +112,7 @@ func TestParseRecursive(t *testing.T) {
 		got, err := c.ParseRecursive(context.Background(), nil)
 		if err != nil {
 			if test.statusCode != 0 {
-				var tikaErr TikaError
+				var tikaErr ClientError
 				if errors.As(err, &tikaErr) {
 					if tikaErr.StatusCode != test.statusCode {
 						t.Errorf("ParseRecursive expected status code %d, got %d", test.statusCode, tikaErr.StatusCode)
