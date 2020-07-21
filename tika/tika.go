@@ -31,7 +31,7 @@ import (
 
 // ClientError represents an error response from the Tika server.
 type ClientError struct {
-	// StatusCode is the http status code returned by the Tika server.
+	// StatusCode is the HTTP status code returned by the Tika server.
 	StatusCode int
 }
 
