@@ -29,6 +29,31 @@ import (
 	"golang.org/x/net/context/ctxhttp"
 )
 
+// ClientError is returned by Client's various parse methods and
+// represents an error response from the Tika server. Example usage:
+//
+//    client := tika.NewClient(nil, tikaURL)
+//    s, err := client.Parse(context.Background(), input)
+//    var tikaErr tika.ClientError
+//    if errors.As(err, &tikaErr) {
+//        switch tikaErr.StatusCode {
+//        case http.StatusUnsupportedMediaType, http.StatusUnprocessableEntity:
+//            // Handle content related error
+//        default:
+//            // Handle possibly intermittent http error
+//        }
+//    } else if err != nil {
+//        // Handle non-http error
+//    }
+type ClientError struct {
+	// StatusCode is the HTTP status code returned by the Tika server.
+	StatusCode int
+}
+
+func (e ClientError) Error() string {
+	return fmt.Sprintf("response code %d", e.StatusCode)
+}
+
 // Client represents a connection to a Tika Server.
 type Client struct {
 	// url is the URL of the Tika Server, including the port (if necessary), but
@@ -107,7 +132,7 @@ func (c *Client) call(ctx context.Context, input io.Reader, method, path string,
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response code %v", resp.StatusCode)
+		return nil, ClientError{resp.StatusCode}
 	}
 	return ioutil.ReadAll(resp.Body)
 }
