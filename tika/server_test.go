@@ -46,7 +46,8 @@ func TestNewServerError(t *testing.T) {
 		port string
 	}{
 		{name: "no jar path"},
-		{name: "invalid port", jar: "jar/path", port: "%31"},
+		{name: "invalid port", jar: "test_resources/test.jar", port: "%31"},
+		{name: "missing jar file", jar: "test_resources/missing.jar"},
 	}
 	for _, test := range tests {
 		if _, err := NewServer(test.jar, test.port); err == nil {
