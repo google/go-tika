@@ -37,7 +37,6 @@ import (
 // since you can pass its URL directly to a Client.
 // Additional Java system properties can be added to a Taka Server before
 // startup by adding to the JavaProps map
-
 type Server struct {
 	jar       string
 	url       string // url is derived from port.
@@ -91,6 +90,13 @@ func NewServer(jar, port string) (*Server, error) {
 	if jar == "" {
 		return nil, fmt.Errorf("no jar file specified")
 	}
+
+	//Check if the jar file exists
+	_, err := os.Stat(jar)
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("jar file [%s] does not exist", jar)
+	}
+
 	if port == "" {
 		port = "9998"
 	}
