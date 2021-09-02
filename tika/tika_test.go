@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -71,6 +72,27 @@ func TestParse(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("Parse got %q, want %q", got, want)
+	}
+}
+
+func TestParseReader(t *testing.T) {
+	want := "test value"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, want)
+	}))
+	defer ts.Close()
+	c := NewClient(nil, ts.URL)
+	body, err := c.ParseReader(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("ParseReader returned nil, want %q", want)
+	}
+	defer body.Close()
+	got, err := ioutil.ReadAll(body)
+	if err != nil {
+		t.Fatalf("Reading the returned body failed: %v", err)
+	}
+	if s := string(got); s != want {
+		t.Errorf("ParseReader got %q, want %q", s, want)
 	}
 }
 
