@@ -401,6 +401,27 @@ func TestTranslate(t *testing.T) {
 	}
 }
 
+func TestTranslateReader(t *testing.T) {
+	want := "test value"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, want)
+	}))
+	defer ts.Close()
+	c := NewClient(nil, ts.URL)
+	body, err := c.TranslateReader(context.Background(), nil, "translator", "src", "dst")
+	if err != nil {
+		t.Fatalf("TranslateReader returned nil, want %q", want)
+	}
+	defer body.Close()
+	got, err := ioutil.ReadAll(body)
+	if err != nil {
+		t.Fatalf("Reading the returned body failed: %v", err)
+	}
+	if s := string(got); s != want {
+		t.Errorf("TranslateReader got %q, want %q", s, want)
+	}
+}
+
 func TestParsers(t *testing.T) {
 	tests := []struct {
 		response string

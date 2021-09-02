@@ -275,6 +275,13 @@ func (c *Client) Translate(ctx context.Context, input io.Reader, t Translator, s
 	return c.callString(ctx, input, "POST", fmt.Sprintf("/translate/all/%s/%s/%s", t, src, dst))
 }
 
+// TranslateReader translates the given input from src language to dst language using t.
+// It returns the translated document as a reader. If an error occurs, the reader is nil, else, the reader
+// must be closed by the caller after usage.
+func (c *Client) TranslateReader(ctx context.Context, input io.Reader, t Translator, src, dst string) (io.ReadCloser, error) {
+	return c.call(ctx, input, "POST", fmt.Sprintf("/translate/all/%s/%s/%s", t, src, dst), nil)
+}
+
 // Version returns the default hello message from Tika server.
 func (c *Client) Version(ctx context.Context) (string, error) {
 	return c.callString(ctx, nil, "GET", "/version")
