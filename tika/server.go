@@ -91,10 +91,9 @@ func NewServer(jar, port string) (*Server, error) {
 		return nil, fmt.Errorf("no jar file specified")
 	}
 
-	//Check if the jar file exists
-	_, err := os.Stat(jar)
-	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("jar file [%s] does not exist", jar)
+	// Check if the jar file exists.
+	if _, err := os.Stat(jar); os.IsNotExist(err) {
+		return nil, fmt.Errorf("jar file %q does not exist", jar)
 	}
 
 	if port == "" {
