@@ -66,7 +66,7 @@ func TestParse(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Parse(context.Background(), nil)
+	got, err := c.Parse(context.Background(), nil, nil)
 	if err != nil {
 		t.Fatalf("Parse returned nil, want %q", want)
 	}
@@ -82,7 +82,7 @@ func TestParseReader(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	body, err := c.ParseReader(context.Background(), nil)
+	body, err := c.ParseReader(context.Background(), nil, nil)
 	if err != nil {
 		t.Fatalf("ParseReader returned nil, want %q", want)
 	}
@@ -166,7 +166,7 @@ func TestMeta(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Meta(context.Background(), nil)
+	got, err := c.Meta(context.Background(), nil, nil)
 	if err != nil {
 		t.Fatalf("Meta returned an error: %v, want %q", err, want)
 	}
@@ -182,7 +182,7 @@ func TestMetaField(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.MetaField(context.Background(), nil, "")
+	got, err := c.MetaField(context.Background(), nil, "", nil)
 	if err != nil {
 		t.Errorf("MetaField returned an error: %v, want %q", err, want)
 	}
