@@ -23,8 +23,9 @@ Start with basic imports:
 You will need a running Server to make API calls to. So, if you don't
 have a server that is already running, and you don't have the Server
 JAR already downloaded, you can download one. The caller is responsible
-for removing the file when no longer needed. Version is a custom type,
-and should be passed as such. There are constants in the code for these.
+for removing the file when no longer needed.
+
+Version is a custom type, and should be passed as such. There are constants in the code for these.
 The following example downloads version 1.21 to the named JAR in the
 current working directory.
 
