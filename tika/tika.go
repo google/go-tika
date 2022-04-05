@@ -282,12 +282,18 @@ func (c *Client) TranslateReader(ctx context.Context, input io.Reader, t Transla
 	return c.call(ctx, input, "POST", fmt.Sprintf("/translate/all/%s/%s/%s", t, src, dst), nil)
 }
 
+// UnpackReader gets the document's attachements.
+func (c *Client) UnpackReader(ctx context.Context, input io.Reader) (io.ReadCloser, error) {
+	return c.call(ctx, input, "POST", "/unpack", tarHeader)
+}
+
 // Version returns the default hello message from Tika server.
 func (c *Client) Version(ctx context.Context) (string, error) {
 	return c.callString(ctx, nil, "GET", "/version")
 }
 
 var jsonHeader = http.Header{"Accept": []string{"application/json"}}
+var tarHeader = http.Header{"Accept": []string{"application/x-tar"}}
 
 // callUnmarshal is like call, but unmarshals the JSON response into v.
 func (c *Client) callUnmarshal(ctx context.Context, path string, v interface{}) error {
