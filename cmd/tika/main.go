@@ -150,7 +150,7 @@ func process(c *tika.Client, action string, file io.Reader) (string, error) {
 			}
 			return strings.Join(bs, "\n"), nil
 		}
-		return c.Parse(context.Background(), file, nil)
+		return c.Parse(context.Background(), file)
 	case detect:
 		return c.Detect(context.Background(), file)
 	case language:

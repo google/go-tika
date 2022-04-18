@@ -153,13 +153,27 @@ func (c *Client) callString(ctx context.Context, input io.Reader, method, path s
 
 // Parse parses the given input, returning the body of the input as a string and an error.
 // If the error is not nil, the body is undefined.
-func (c *Client) Parse(ctx context.Context, input io.Reader, header http.Header) (string, error) {
-	return c.callString(ctx, input, "PUT", "/tika", header)
+func (c *Client) Parse(ctx context.Context, input io.Reader) (string, error) {
+	return c.ParseWithHeader(ctx, input, nil)
 }
 
 // ParseReader parses the given input, returning the body of the input as a reader and an error.
 // If the error is nil, the returned reader must be closed, else, the reader is nil.
-func (c *Client) ParseReader(ctx context.Context, input io.Reader, header http.Header) (io.ReadCloser, error) {
+func (c *Client) ParseReader(ctx context.Context, input io.Reader) (io.ReadCloser, error) {
+	return c.ParseReaderWithHeader(ctx, input, nil)
+}
+
+// ParseWithHeader parses the given input, returning the body of the input as a string and an error.
+// If the error is not nil. the body is undefined.
+// This function also accepts a header so the caller can specify things like `Accept`
+func (c *Client) ParseWithHeader(ctx context.Context, input io.Reader, header http.Header) (string, error) {
+	return c.callString(ctx, input, "PUT", "/tika", header)
+}
+
+// ParseReaderWithHeader parses the given input, returning the body of the input as a reader and an error.
+// If the error is nil, the returned reader must be closed, else, the reader is nil.
+// This function also accepts a header so the caller can specify things like `Accept`
+func (c *Client) ParseReaderWithHeader(ctx context.Context, input io.Reader, header http.Header) (io.ReadCloser, error) {
 	return c.call(ctx, input, "PUT", "/tika", header)
 }
 

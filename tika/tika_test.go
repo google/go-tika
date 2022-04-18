@@ -66,12 +66,36 @@ func TestParse(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Parse(context.Background(), nil, nil)
+	got, err := c.Parse(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Parse returned nil, want %q", want)
 	}
 	if got != want {
 		t.Errorf("Parse got %q, want %q", got, want)
+	}
+}
+
+func TestParseWithHeader(t *testing.T) {
+	want := "test value"
+	wantHeader := "application/json"
+	gotHeader := ""
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Get("Accept")
+		fmt.Fprint(w, want)
+	}))
+	defer ts.Close()
+	hdr := http.Header{}
+	hdr["Accept"] = []string{"application/json"}
+	c := NewClient(nil, ts.URL)
+	got, err := c.ParseWithHeader(context.Background(), nil, hdr)
+	if err != nil {
+		t.Fatalf("Parse returned nil, want %q", want)
+	}
+	if got != want {
+		t.Errorf("Parse got %q, want %q", got, want)
+	}
+	if gotHeader != wantHeader {
+		t.Errorf("ParseWithHeader Header incorrect got %q, want %q", gotHeader, wantHeader)
 	}
 }
 
@@ -82,7 +106,7 @@ func TestParseReader(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	body, err := c.ParseReader(context.Background(), nil, nil)
+	body, err := c.ParseReader(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("ParseReader returned nil, want %q", want)
 	}
