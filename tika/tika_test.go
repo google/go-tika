@@ -190,12 +190,36 @@ func TestMeta(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.Meta(context.Background(), nil, nil)
+	got, err := c.Meta(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Meta returned an error: %v, want %q", err, want)
 	}
 	if got != want {
 		t.Errorf("Meta got %q, want %q", got, want)
+	}
+}
+
+func TestMetaWithHeader(t *testing.T) {
+	want := "test value"
+	wantHeader := "application/json"
+	gotHeader := ""
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Get("Accept")
+		fmt.Fprint(w, want)
+	}))
+	defer ts.Close()
+	c := NewClient(nil, ts.URL)
+	hdr := http.Header{}
+	hdr["Accept"] = []string{"application/json"}
+	got, err := c.MetaWithHeader(context.Background(), nil, hdr)
+	if err != nil {
+		t.Fatalf("MetaWithHeader returned an error: %v, want %q", err, want)
+	}
+	if got != want {
+		t.Errorf("MetaWithHeader got %q, want %q", got, want)
+	}
+	if gotHeader != wantHeader {
+		t.Errorf("TestMetaWithHeader Header incorrect got %q, want %q", gotHeader, wantHeader)
 	}
 }
 
@@ -206,12 +230,37 @@ func TestMetaField(t *testing.T) {
 	}))
 	defer ts.Close()
 	c := NewClient(nil, ts.URL)
-	got, err := c.MetaField(context.Background(), nil, "", nil)
+	got, err := c.MetaField(context.Background(), nil, "")
 	if err != nil {
 		t.Errorf("MetaField returned an error: %v, want %q", err, want)
 	}
 	if got != want {
 		t.Errorf("MetaField got %q, want %q", got, want)
+	}
+
+}
+
+func TestMetaFieldWithHeader(t *testing.T) {
+	want := "test value"
+	wantHeader := "application/json"
+	gotHeader := ""
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Get("Accept")
+		fmt.Fprint(w, want)
+	}))
+	defer ts.Close()
+	c := NewClient(nil, ts.URL)
+	hdr := http.Header{}
+	hdr["Accept"] = []string{"application/json"}
+	got, err := c.MetaFieldWithHeader(context.Background(), nil, "", hdr)
+	if err != nil {
+		t.Errorf("MetaFieldWithHeader returned an error: %v, want %q", err, want)
+	}
+	if got != want {
+		t.Errorf("MetaFieldWithHeader got %q, want %q", got, want)
+	}
+	if gotHeader != wantHeader {
+		t.Errorf("TestMetaFieldWithHeader Header incorrect got %q, want %q", gotHeader, wantHeader)
 	}
 }
 

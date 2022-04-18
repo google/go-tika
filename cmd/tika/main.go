@@ -157,7 +157,7 @@ func process(c *tika.Client, action string, file io.Reader) (string, error) {
 		return c.Language(context.Background(), file)
 	case meta:
 		if *metaField != "" {
-			return c.MetaField(context.Background(), file, *metaField, nil)
+			return c.MetaField(context.Background(), file, *metaField)
 		}
 		if *recursive {
 			mr, err := c.MetaRecursive(context.Background(), file)
@@ -170,7 +170,7 @@ func process(c *tika.Client, action string, file io.Reader) (string, error) {
 			}
 			return string(bytes), nil
 		}
-		return c.Meta(context.Background(), file, nil)
+		return c.Meta(context.Background(), file)
 	case version:
 		return c.Version(context.Background())
 	case parsers:

@@ -197,13 +197,27 @@ func (c *Client) ParseRecursive(ctx context.Context, input io.Reader) ([]string,
 
 // Meta parses the metadata from the given input, returning the metadata and an
 // error. If the error is not nil, the metadata is undefined.
-func (c *Client) Meta(ctx context.Context, input io.Reader, header http.Header) (string, error) {
+func (c *Client) Meta(ctx context.Context, input io.Reader) (string, error) {
+	return c.MetaWithHeader(ctx, input, nil)
+}
+
+// MetaWithHeader parses the metadata from the given input, returning the metadata and an
+// error. If the error is not nil, the metadata is undefined.
+// This function also accepts a header so the caller can specify things like `Accept`
+func (c *Client) MetaWithHeader(ctx context.Context, input io.Reader, header http.Header) (string, error) {
 	return c.callString(ctx, input, "PUT", "/meta", header)
 }
 
 // MetaField parses the metadata from the given input and returns the given
 // field. If the error is not nil, the result string is undefined.
-func (c *Client) MetaField(ctx context.Context, input io.Reader, field string, header http.Header) (string, error) {
+func (c *Client) MetaField(ctx context.Context, input io.Reader, field string) (string, error) {
+	return c.MetaFieldWithHeader(ctx, input, field, nil)
+}
+
+// MetaFieldWithHeader parses the metadata from the given input and returns the given
+// field. If the error is not nil, the result string is undefined.
+// This function also accepts a header so the caller can specify things like `Accept`
+func (c *Client) MetaFieldWithHeader(ctx context.Context, input io.Reader, field string, header http.Header) (string, error) {
 	return c.callString(ctx, input, "PUT", fmt.Sprintf("/meta/%v", field), header)
 }
 
