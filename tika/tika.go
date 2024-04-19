@@ -29,19 +29,19 @@ import (
 // ClientError is returned by Client's various parse methods and
 // represents an error response from the Tika server. Example usage:
 //
-//    client := tika.NewClient(nil, tikaURL)
-//    s, err := client.Parse(context.Background(), input)
-//    var tikaErr tika.ClientError
-//    if errors.As(err, &tikaErr) {
-//        switch tikaErr.StatusCode {
-//        case http.StatusUnsupportedMediaType, http.StatusUnprocessableEntity:
-//            // Handle content related error
-//        default:
-//            // Handle possibly intermittent http error
-//        }
-//    } else if err != nil {
-//        // Handle non-http error
-//    }
+//	client := tika.NewClient(nil, tikaURL)
+//	s, err := client.Parse(context.Background(), input)
+//	var tikaErr tika.ClientError
+//	if errors.As(err, &tikaErr) {
+//	    switch tikaErr.StatusCode {
+//	    case http.StatusUnsupportedMediaType, http.StatusUnprocessableEntity:
+//	        // Handle content related error
+//	    default:
+//	        // Handle possibly intermittent http error
+//	    }
+//	} else if err != nil {
+//	    // Handle non-http error
+//	}
 type ClientError struct {
 	// StatusCode is the HTTP status code returned by the Tika server.
 	StatusCode int
