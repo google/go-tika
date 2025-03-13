@@ -1,5 +1,5 @@
 module github.com/google/go-tika
 
-go 1.11
+go 1.23.0
 
 require golang.org/x/net v0.36.0
