@@ -17,8 +17,10 @@ limitations under the License.
 package tika
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -106,6 +108,10 @@ const (
 	YandexTranslator    Translator = "org.apache.tika.language.translate.YandexTranslator"
 )
 
+// TKContent is the metadata field of the content of a file after recursive
+// parsing in Tika 4.x. See ParseRecursive.
+const TKContent = "tk:content"
+
 // XTIKAContent is the metadata field of the content of a file after recursive
 // parsing. See ParseRecursive and MetaRecursive.
 const XTIKAContent = "X-TIKA:content"
@@ -188,7 +194,11 @@ func (c *Client) ParseRecursive(ctx context.Context, input io.Reader) ([]string,
 	}
 	var r []string
 	for _, d := range m {
-		if content := d[XTIKAContent]; len(content) > 0 {
+		content := d[TKContent]
+		if len(content) == 0 {
+			content = d[XTIKAContent]
+		}
+		if len(content) > 0 {
 			r = append(r, content[0])
 		}
 	}
@@ -231,15 +241,39 @@ func (c *Client) Detect(ctx context.Context, input io.Reader) (string, error) {
 // language code and an error. If the error is not nil, the language is
 // undefined.
 func (c *Client) Language(ctx context.Context, input io.Reader) (string, error) {
-	return c.callString(ctx, input, "PUT", "/language/stream", nil)
+	var r1, r2 io.Reader
+	if input != nil {
+		buf, err := io.ReadAll(input)
+		if err != nil {
+			return "", err
+		}
+		r1 = bytes.NewReader(buf)
+		r2 = bytes.NewReader(buf)
+	}
+	res, err := c.callString(ctx, r1, "PUT", "/language", nil)
+	if err != nil {
+		var clientErr ClientError
+		if errors.As(err, &clientErr) && (clientErr.StatusCode == http.StatusNotFound || clientErr.StatusCode == http.StatusMethodNotAllowed) {
+			return c.callString(ctx, r2, "PUT", "/language/stream", nil)
+		}
+		return "", err
+	}
+	return res, nil
 }
 
 // LanguageString detects the language of the given string, returning the two letter
 // language code and an error. If the error is not nil, the language is
 // undefined.
 func (c *Client) LanguageString(ctx context.Context, input string) (string, error) {
-	r := strings.NewReader(input)
-	return c.callString(ctx, r, "PUT", "/language/string", nil)
+	res, err := c.callString(ctx, strings.NewReader(input), "PUT", "/language", nil)
+	if err != nil {
+		var clientErr ClientError
+		if errors.As(err, &clientErr) && (clientErr.StatusCode == http.StatusNotFound || clientErr.StatusCode == http.StatusMethodNotAllowed) {
+			return c.callString(ctx, strings.NewReader(input), "PUT", "/language/string", nil)
+		}
+		return "", err
+	}
+	return res, nil
 }
 
 // MetaRecursive parses the given input and all embedded documents. The result

@@ -26,6 +26,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -139,6 +140,18 @@ func TestParseRecursive(t *testing.T) {
 			want:     []string{"test"},
 		},
 		{
+			response: `[{"tk:content":"test 1"}]`,
+			want:     []string{"test 1"},
+		},
+		{
+			response: `[{"tk:content":"test 1"},{"tk:content":"test 2"}]`,
+			want:     []string{"test 1", "test 2"},
+		},
+		{
+			response: `[{"tk:content":"test tk","X-TIKA:content":"test xtika"}]`,
+			want:     []string{"test tk"},
+		},
+		{
 			response: `[]`,
 		},
 		{
@@ -180,6 +193,12 @@ func TestParseRecursive(t *testing.T) {
 func TestParseRecursiveError(t *testing.T) {
 	if _, err := errorClient.ParseRecursive(context.Background(), nil); err == nil {
 		t.Error("ParseRecursive got no error, want an error")
+	}
+}
+
+func TestTKContentConstant(t *testing.T) {
+	if TKContent != "tk:content" {
+		t.Errorf("TKContent = %q, want %q", TKContent, "tk:content")
 	}
 }
 
@@ -281,34 +300,270 @@ func TestDetect(t *testing.T) {
 }
 
 func TestLanguage(t *testing.T) {
-	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprint(w, want)
-	}))
-	defer ts.Close()
-	c := NewClient(nil, ts.URL)
-	got, err := c.Language(context.Background(), nil)
-	if err != nil {
-		t.Errorf("Language returned an error: %v, want %q", err, want)
+	// Tika 4.x: /language returns 200, /language/stream is not used.
+	{
+		want := "en"
+		inputBody := "hello world"
+		streamCalled := false
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/language/stream" {
+				streamCalled = true
+			}
+			if r.URL.Path == "/language" {
+				body, _ := ioutil.ReadAll(r.Body)
+				if string(body) != inputBody {
+					t.Errorf("/language got body %q, want %q", string(body), inputBody)
+				}
+				fmt.Fprint(w, want)
+				return
+			}
+			http.NotFound(w, r)
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		got, err := c.Language(context.Background(), strings.NewReader(inputBody))
+		if err != nil {
+			t.Errorf("Language returned an error: %v, want %q", err, want)
+		}
+		if got != want {
+			t.Errorf("Language got %q, want %q", got, want)
+		}
+		if streamCalled {
+			t.Errorf("Language called /language/stream unexpectedly")
+		}
 	}
-	if got != want {
-		t.Errorf("Language got %q, want %q", got, want)
+
+	// Legacy fallback: /language returns 404, fallback to /language/stream succeeds with preserved body.
+	{
+		want := "fr"
+		inputBody := "bonjour le monde"
+		var gotFallbackBody string
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/language":
+				w.WriteHeader(http.StatusNotFound)
+			case "/language/stream":
+				body, _ := ioutil.ReadAll(r.Body)
+				gotFallbackBody = string(body)
+				fmt.Fprint(w, want)
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		got, err := c.Language(context.Background(), strings.NewReader(inputBody))
+		if err != nil {
+			t.Errorf("Language fallback returned an error: %v, want %q", err, want)
+		}
+		if got != want {
+			t.Errorf("Language fallback got %q, want %q", got, want)
+		}
+		if gotFallbackBody != inputBody {
+			t.Errorf("Language fallback got body %q, want %q", gotFallbackBody, inputBody)
+		}
+	}
+
+	// Legacy fallback: /language returns 405 (Method Not Allowed), fallback succeeds.
+	{
+		want := "de"
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/language":
+				w.WriteHeader(http.StatusMethodNotAllowed)
+			case "/language/stream":
+				fmt.Fprint(w, want)
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		got, err := c.Language(context.Background(), strings.NewReader("guten tag"))
+		if err != nil {
+			t.Errorf("Language fallback on 405 returned an error: %v, want %q", err, want)
+		}
+		if got != want {
+			t.Errorf("Language fallback on 405 got %q, want %q", got, want)
+		}
+	}
+
+	// Server error: 500 from /language does NOT trigger fallback.
+	{
+		streamCalled := false
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/language/stream" {
+				streamCalled = true
+			}
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		if _, err := c.Language(context.Background(), strings.NewReader("hello")); err == nil {
+			t.Errorf("Language on 500 got nil error, want error")
+		}
+		if streamCalled {
+			t.Errorf("Language triggered fallback on 500")
+		}
+	}
+
+	// Nil input: works without error.
+	{
+		want := "es"
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/language" {
+				fmt.Fprint(w, want)
+			}
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		got, err := c.Language(context.Background(), nil)
+		if err != nil {
+			t.Errorf("Language(nil) returned an error: %v, want %q", err, want)
+		}
+		if got != want {
+			t.Errorf("Language(nil) got %q, want %q", got, want)
+		}
+	}
+
+	// Buffering error: if reader fails, return error without making a request.
+	{
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("unexpected HTTP request made when reader failed")
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		errReader := &testErrReader{err: errors.New("read error")}
+		if _, err := c.Language(context.Background(), errReader); err == nil {
+			t.Errorf("Language with failing reader got nil error, want error")
+		}
 	}
 }
 
+type testErrReader struct {
+	err error
+}
+
+func (r *testErrReader) Read(_ []byte) (int, error) {
+	return 0, r.err
+}
+
 func TestLanguageString(t *testing.T) {
-	want := "test value"
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprint(w, want)
-	}))
-	defer ts.Close()
-	c := NewClient(nil, ts.URL)
-	got, err := c.LanguageString(context.Background(), "")
-	if err != nil {
-		t.Errorf("LanguageString returned an error: %v, want %q", err, want)
+	// Tika 4.x: /language returns 200, /language/string is not used.
+	{
+		want := "en"
+		inputBody := "hello world"
+		stringCalled := false
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/language/string" {
+				stringCalled = true
+			}
+			if r.URL.Path == "/language" {
+				body, _ := ioutil.ReadAll(r.Body)
+				if string(body) != inputBody {
+					t.Errorf("/language got body %q, want %q", string(body), inputBody)
+				}
+				fmt.Fprint(w, want)
+				return
+			}
+			http.NotFound(w, r)
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		got, err := c.LanguageString(context.Background(), inputBody)
+		if err != nil {
+			t.Errorf("LanguageString returned an error: %v, want %q", err, want)
+		}
+		if got != want {
+			t.Errorf("LanguageString got %q, want %q", got, want)
+		}
+		if stringCalled {
+			t.Errorf("LanguageString called /language/string unexpectedly")
+		}
 	}
-	if got != want {
-		t.Errorf("LanguageString got %q, want %q", got, want)
+
+	// Legacy fallback: /language returns 404, fallback to /language/string succeeds with preserved body.
+	{
+		want := "fr"
+		inputBody := "bonjour le monde"
+		var gotFallbackBody string
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/language":
+				w.WriteHeader(http.StatusNotFound)
+			case "/language/string":
+				body, _ := ioutil.ReadAll(r.Body)
+				gotFallbackBody = string(body)
+				fmt.Fprint(w, want)
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		got, err := c.LanguageString(context.Background(), inputBody)
+		if err != nil {
+			t.Errorf("LanguageString fallback returned an error: %v, want %q", err, want)
+		}
+		if got != want {
+			t.Errorf("LanguageString fallback got %q, want %q", got, want)
+		}
+		if gotFallbackBody != inputBody {
+			t.Errorf("LanguageString fallback got body %q, want %q", gotFallbackBody, inputBody)
+		}
+	}
+
+	// Legacy fallback: /language returns 405 (Method Not Allowed), fallback succeeds.
+	{
+		want := "de"
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/language":
+				w.WriteHeader(http.StatusMethodNotAllowed)
+			case "/language/string":
+				fmt.Fprint(w, want)
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		got, err := c.LanguageString(context.Background(), "guten tag")
+		if err != nil {
+			t.Errorf("LanguageString fallback on 405 returned an error: %v, want %q", err, want)
+		}
+		if got != want {
+			t.Errorf("LanguageString fallback on 405 got %q, want %q", got, want)
+		}
+	}
+
+	// Server error: 500 from /language does NOT trigger fallback.
+	{
+		stringCalled := false
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/language/string" {
+				stringCalled = true
+			}
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer ts.Close()
+
+		c := NewClient(nil, ts.URL)
+		if _, err := c.LanguageString(context.Background(), "hello"); err == nil {
+			t.Errorf("LanguageString on 500 got nil error, want error")
+		}
+		if stringCalled {
+			t.Errorf("LanguageString triggered fallback on 500")
+		}
 	}
 }
 
