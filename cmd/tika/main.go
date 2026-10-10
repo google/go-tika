@@ -24,6 +24,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-tika/tika"
@@ -54,11 +55,12 @@ const (
 
 // Command line flags.
 var (
-	downloadVersion = flag.String("download_version", "", fmt.Sprintf("Tika Server JAR version to download. If -serverJAR is specified, it will be downloaded to that location, otherwise it will be downloaded to your working directory. If the JAR has already been downloaded and has the correct MD5, this will do nothing. Valid versions: %v.", tika.Versions))
+	downloadVersion = flag.String("download_version", "", fmt.Sprintf("Tika Server JAR version to download. If -serverJAR is specified, it will be downloaded to that location, otherwise it will be downloaded to your working directory. If the JAR has already been downloaded and has the correct SHA-512, this will do nothing. Tika 4.x and later are distributed as a zip, which is downloaded and extracted to a tika-server-<version> directory in your working directory instead, and cannot be used with -server_jar. Valid versions: %v.", tika.Versions))
 	filename        = flag.String("filename", "", "Path to file to parse.")
 	metaField       = flag.String("field", "", `Specific field to get when using the "meta" action. Undefined when using the -recursive flag.`)
 	recursive       = flag.Bool("recursive", false, `Whether to run "parse" or "meta" recursively, returning a list with one element per embedded document. Undefined when using the -field flag.`)
 	serverJAR       = flag.String("server_jar", "", "Absolute path to the Tika Server JAR. This will start a new server, ignoring -serverURL.")
+	serverConfig    = flag.String("server_config", "", "Path to a tika-config.xml file to pass to the Tika Server started with -server_jar or -download_version.")
 	serverURL       = flag.String("server_url", "", "URL of Tika server.")
 )
 
@@ -84,11 +86,22 @@ func main() {
 		if !supported {
 			log.Fatalf("unsupported server version: %q", *downloadVersion)
 		}
-		if *serverJAR == "" {
-			*serverJAR = "tika-server-" + string(v) + ".jar"
-		}
-		if err := tika.DownloadServer(context.Background(), v, *serverJAR); err != nil {
-			log.Fatal(err)
+		if isZipDistribution(v) {
+			if *serverJAR != "" {
+				log.Fatalf("-server_jar cannot be used with -download_version %s: it is downloaded to the tika-server-%s directory", v, v)
+			}
+			jar, err := tika.DownloadServerDir(context.Background(), v, "tika-server-"+string(v))
+			if err != nil {
+				log.Fatal(err)
+			}
+			*serverJAR = jar
+		} else {
+			if *serverJAR == "" {
+				*serverJAR = "tika-server-" + string(v) + ".jar"
+			}
+			if err := tika.DownloadServer(context.Background(), v, *serverJAR); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 	if *serverURL == "" && *serverJAR == "" {
@@ -101,6 +114,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		s.ConfigPath = *serverConfig
 
 		err = s.Start(context.Background())
 		if err != nil {
@@ -135,6 +149,14 @@ func main() {
 		log.Fatalf("tika error: %v", err)
 	}
 	fmt.Println(b)
+}
+
+// isZipDistribution reports whether v is distributed as a zip, which is true
+// for Tika 4.x and later.
+func isZipDistribution(v tika.Version) bool {
+	major, _, _ := strings.Cut(string(v), ".")
+	n, err := strconv.Atoi(major)
+	return err == nil && n >= 4
 }
 
 func process(c *tika.Client, action string, file io.Reader) (string, error) {

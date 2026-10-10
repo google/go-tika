@@ -95,9 +95,14 @@ type Detector struct {
 }
 
 // Translator represents the Java package of a Tika Translator.
+//
+// In Tika Server 2.x and later, translators are in the
+// org.apache.tika.language.translate.impl package, for example
+// tika.Translator("org.apache.tika.language.translate.impl.GoogleTranslator"),
+// and the tika-translate module must be on the server classpath.
 type Translator string
 
-// Translators available by default in Tika. You must configure all required
+// Translators available by default in Tika 1.x. You must configure all required
 // authentication details in Tika Server (for example, an API key).
 const (
 	Lingo24Translator   Translator = "org.apache.tika.language.translate.Lingo24Translator"
@@ -234,7 +239,24 @@ func (c *Client) MetaFieldWithHeader(ctx context.Context, input io.Reader, field
 // Detect gets the mimetype of the given input, returning the mimetype and an
 // error. If the error is not nil, the mimetype is undefined.
 func (c *Client) Detect(ctx context.Context, input io.Reader) (string, error) {
-	return c.callString(ctx, input, "PUT", "/detect/stream", nil)
+	var r1, r2 io.Reader
+	if input != nil {
+		buf, err := io.ReadAll(input)
+		if err != nil {
+			return "", err
+		}
+		r1 = bytes.NewReader(buf)
+		r2 = bytes.NewReader(buf)
+	}
+	res, err := c.callString(ctx, r1, "PUT", "/detect", nil)
+	if err != nil {
+		var clientErr ClientError
+		if errors.As(err, &clientErr) && (clientErr.StatusCode == http.StatusNotFound || clientErr.StatusCode == http.StatusMethodNotAllowed) {
+			return c.callString(ctx, r2, "PUT", "/detect/stream", nil)
+		}
+		return "", err
+	}
+	return res, nil
 }
 
 // Language detects the language of the given input, returning the two letter
@@ -331,6 +353,7 @@ func (c *Client) MetaRecursiveType(ctx context.Context, input io.Reader, content
 
 // Translate returns an error and the translated input from src language to
 // dst language using t. If the error is not nil, the translation is undefined.
+// Translation is not available in Tika Server 4.x.
 func (c *Client) Translate(ctx context.Context, input io.Reader, t Translator, src, dst string) (string, error) {
 	return c.callString(ctx, input, "POST", fmt.Sprintf("/translate/all/%s/%s/%s", t, src, dst), nil)
 }
@@ -338,6 +361,7 @@ func (c *Client) Translate(ctx context.Context, input io.Reader, t Translator, s
 // TranslateReader translates the given input from src language to dst language using t.
 // It returns the translated document as a reader. If an error occurs, the reader is nil, else, the reader
 // must be closed by the caller after usage.
+// Translation is not available in Tika Server 4.x.
 func (c *Client) TranslateReader(ctx context.Context, input io.Reader, t Translator, src, dst string) (io.ReadCloser, error) {
 	return c.call(ctx, input, "POST", fmt.Sprintf("/translate/all/%s/%s/%s", t, src, dst), nil)
 }

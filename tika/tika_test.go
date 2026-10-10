@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -296,6 +297,62 @@ func TestDetect(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("Detect got %q, want %q", got, want)
+	}
+}
+
+func TestDetectFallback(t *testing.T) {
+	tests := []struct {
+		name         string
+		detectStatus int
+		wantPaths    []string
+		wantErr      bool
+	}{
+		{"Tika 4.x", http.StatusOK, []string{"/detect"}, false},
+		{"legacy 404", http.StatusNotFound, []string{"/detect", "/detect/stream"}, false},
+		{"legacy 405", http.StatusMethodNotAllowed, []string{"/detect", "/detect/stream"}, false},
+		{"server error", http.StatusInternalServerError, []string{"/detect"}, true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			input := "<html></html>"
+			want := "text/html"
+			var gotPaths []string
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPaths = append(gotPaths, r.URL.Path)
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Errorf("error reading request body: %v", err)
+				}
+				if string(body) != input {
+					t.Errorf("%s got body %q, want %q", r.URL.Path, body, input)
+				}
+				if r.URL.Path == "/detect" && test.detectStatus != http.StatusOK {
+					w.WriteHeader(test.detectStatus)
+					return
+				}
+				fmt.Fprint(w, want)
+			}))
+			defer ts.Close()
+
+			c := NewClient(nil, ts.URL)
+			got, err := c.Detect(context.Background(), strings.NewReader(input))
+			if gotErr := err != nil; gotErr != test.wantErr {
+				t.Fatalf("Detect got error %v, want error: %v", err, test.wantErr)
+			}
+			if !test.wantErr && got != want {
+				t.Errorf("Detect got %q, want %q", got, want)
+			}
+			if !reflect.DeepEqual(gotPaths, test.wantPaths) {
+				t.Errorf("Detect called %v, want %v", gotPaths, test.wantPaths)
+			}
+		})
+	}
+}
+
+func TestDetectConnectionError(t *testing.T) {
+	c := NewClient(nil, "https://unknown_test_url")
+	if _, err := c.Detect(context.Background(), nil); err == nil {
+		t.Error("Detect got no error, want an error")
 	}
 }
 
