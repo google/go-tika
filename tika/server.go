@@ -19,12 +19,15 @@ package tika
 import (
 	"context"
 	"crypto/sha512"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context/ctxhttp"
@@ -36,7 +39,9 @@ import (
 // There is no need to create a Server for an already running Tika Server
 // since you can pass its URL directly to a Client.
 // Additional Java system properties can be added to a Taka Server before
-// startup by adding to the JavaProps map
+// startup by adding to the JavaProps map.
+// Tika Server 2.x requires Java 8 or later and Tika Server 3.x requires
+// Java 11 or later.
 type Server struct {
 	jar       string
 	url       string // url is derived from port.
@@ -44,10 +49,19 @@ type Server struct {
 	cmd       *exec.Cmd
 	child     *ChildOptions
 	JavaProps map[string]string
+	// ConfigPath is the path to a tika-config.xml file passed to the server
+	// with the -c flag. If empty, the flag is not included. In Tika Server
+	// 2.x and later, settings such as forking, timeouts and max files are
+	// configured in the <server><params> section of this file.
+	ConfigPath string
 }
 
 // ChildOptions represent command line parameters that can be used when Tika is run with the -spawnChild option.
 // If a field is less than or equal to 0, the associated flag is not included.
+//
+// Deprecated: ChildOptions are only supported by Tika Server 1.x. Tika Server
+// 2.x and later fork a child process by default; configure <server><params>
+// in a tika-config.xml and set Server.ConfigPath instead.
 type ChildOptions struct {
 	MaxFiles          int
 	TaskPulseMillis   int
@@ -119,6 +133,10 @@ func NewServer(jar, port string) (*Server, error) {
 // ChildMode sets up the server to use the -spawnChild option.
 // If used, ChildMode must be called before starting the server.
 // If you want to turn off the -spawnChild option, call Server.ChildMode(nil).
+//
+// Deprecated: ChildMode is only supported by Tika Server 1.x, and Tika Server
+// 2.x and later will fail to start with it. Configure <server><params> in a
+// tika-config.xml and set Server.ConfigPath instead.
 func (s *Server) ChildMode(ops *ChildOptions) error {
 	if s.cmd != nil {
 		return fmt.Errorf("server process already started, cannot switch to spawn child mode")
@@ -144,7 +162,11 @@ func (s *Server) Start(ctx context.Context) error {
 		props = append(props, fmt.Sprintf("-D%s=%q", k, v))
 	}
 
-	args := append(append(props, "-jar", s.jar, "-p", s.port), s.child.args()...)
+	args := append(props, "-jar", s.jar, "-p", s.port)
+	if s.ConfigPath != "" {
+		args = append(args, "-c", s.ConfigPath)
+	}
+	args = append(args, s.child.args()...)
 	cmd := command("java", args...)
 
 	if err := cmd.Start(); err != nil {
@@ -211,7 +233,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}()
 	select {
 	case err := <-errChannel:
-		if err != nil {
+		if err != nil && !interruptExit(err) {
 			return fmt.Errorf("could not wait for server to finish: %v", err)
 		}
 	case <-ctx.Done():
@@ -220,6 +242,14 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// interruptExit reports whether err is the exit status of a Java process that
+// shut down because of os.Interrupt. The JVM runs its shutdown hooks and exits
+// with status 130 (128 + SIGINT) when interrupted.
+func interruptExit(err error) bool {
+	var exitErr *exec.ExitError
+	return errors.As(err, &exitErr) && exitErr.ExitCode() == 130
 }
 
 func sha512Hash(path string) (string, error) {
@@ -239,20 +269,51 @@ func sha512Hash(path string) (string, error) {
 // A Version represents a Tika Server version.
 type Version string
 
-// Supported versions of Tika Server.
+// Deprecated/end-of-life versions of Tika Server.
 const (
 	Version119 Version = "1.19"
 	Version120 Version = "1.20"
 	Version121 Version = "1.21"
 )
 
+// Supported versions of Tika Server.
+const (
+	Version260 Version = "2.6.0"
+	Version270 Version = "2.7.0"
+	Version280 Version = "2.8.0"
+	Version294 Version = "2.9.4"
+	Version300 Version = "3.0.0"
+	Version310 Version = "3.1.0"
+	Version323 Version = "3.2.3"
+	Version332 Version = "3.3.2"
+)
+
 // Versions is a list of supported versions of Apache Tika.
-var Versions = []Version{Version119, Version120, Version121}
+var Versions = []Version{Version260, Version270, Version280, Version294, Version300, Version310, Version323, Version332}
 
 var sha512s = map[Version]string{
 	Version119: "a9e2b6186cdb9872466d3eda791d0e1cd059da923035940d4b51bb1adc4a356670fde46995725844a2dd500a09f3a5631d0ca5fbc2d61a59e8e0bd95c9dfa6c2",
 	Version120: "a7ef35317aba76be8606f9250893efece8b93384e835a18399da18a095b19a15af591e3997828d4ebd3023f21d5efad62a91918610c44e692cfd9bed01d68382",
 	Version121: "e705c836b2110530c8d363d05da27f65c4f6c9051b660cefdae0e5113c365dbabed2aa1e4171c8e52dbe4cbaa085e3d8a01a5a731e344942c519b85836da646c",
+	Version260: "df72b1179c39c1a70daaf19a43acc1a2c7e6ae7aeae2bf9aa4a1a447ac460324d50ba1a98da81d4a996cea0a86b68cb168ae134b4b1561dea278a245b02d591a",
+	Version270: "23759bacee231bc700765d4f934da9eeabfa8e407381b72472d66da532509f2edd976bce33fd38c34a8bf43b2b28a1e19ab9ddfc187f9cd96f8a31a285248e13",
+	Version280: "e8a23ce98c412a5c157e002934270a0b18ce86004dee0ffded7ddc6482b6b3931ccb7ed7f13853d16697e85e3d2785ae6893e247cf90561c845b6d645f8da61c",
+	Version294: "7498f6e87cc331fa14a994594f941d8935d6bf7b11407ea2ff893b1acd8f19c38dca45f1e651a736eb7ba963ab1801833e56e02096d82d26c8650c48ffe1c2ce",
+	Version300: "9228dbf437d065f23c59f33a3dd26f4d95e6339dd0a362714acae59d89a23e910838f4ed6b870e7b780d027786f4db1a07b194033f225258a95d133e2b000bba",
+	Version310: "e9f6df28329cb36519b748e04eb9c96db2e776f4bfafcb92a48b799e9448ee182c908eeb3e807a98f6c59af79a01e72022d7f5654764342b6d6688c288817c8e",
+	Version323: "3099b58451a74e940f8a4f76933e0de86bd4dba70efd1b645df1926988b31dac7f1196efda43281aa8d88b1e29ef73adf11f069b7a27d6baf753a83bf95f5f86",
+	Version332: "fb1f2fe57ac458b09d44d41d816f582e1d2fc93488acff6275caf414d8d5ef94e42166edc0b488dc2fb6ef3aa21fab62b107c43b9060385ff6d675e393c2c9e9",
+}
+
+// downloadURL returns the Maven Central URL of the Tika Server JAR for v.
+// Tika 1.x was published as tika-server, and Tika 2.x and later as
+// tika-server-standard.
+func downloadURL(v Version) string {
+	artifact := "tika-server-standard"
+	if strings.HasPrefix(string(v), "1.") {
+		artifact = "tika-server"
+	}
+	return fmt.Sprintf("https://repo1.maven.org/maven2/org/apache/tika/%s/%s/%s-%s.jar", artifact, v, artifact, v)
 }
 
 // DownloadServer downloads and validates the given server version,
@@ -277,14 +338,20 @@ func DownloadServer(ctx context.Context, v Version, path string) error {
 	}
 	defer out.Close()
 
-	url := fmt.Sprintf("http://search.maven.org/remotecontent?filepath=org/apache/tika/tika-server/%s/tika-server-%s.jar", v, v)
+	url := downloadURL(v)
 	resp, err := ctxhttp.Get(ctx, nil, url)
 	if err != nil {
 		return fmt.Errorf("unable to download %q: %v", url, err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unable to download %q: response code %d", url, resp.StatusCode)
+	}
 
 	if _, err := io.Copy(out, resp.Body); err != nil {
+		return fmt.Errorf("error saving download: %v", err)
+	}
+	if err := out.Close(); err != nil {
 		return fmt.Errorf("error saving download: %v", err)
 	}
 

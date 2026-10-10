@@ -95,9 +95,14 @@ type Detector struct {
 }
 
 // Translator represents the Java package of a Tika Translator.
+//
+// In Tika Server 2.x and later, translators are in the
+// org.apache.tika.language.translate.impl package, for example
+// tika.Translator("org.apache.tika.language.translate.impl.GoogleTranslator"),
+// and the tika-translate module must be on the server classpath.
 type Translator string
 
-// Translators available by default in Tika. You must configure all required
+// Translators available by default in Tika 1.x. You must configure all required
 // authentication details in Tika Server (for example, an API key).
 const (
 	Lingo24Translator   Translator = "org.apache.tika.language.translate.Lingo24Translator"

@@ -24,6 +24,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"reflect"
+	"regexp"
 	"strconv"
 	"testing"
 	"time"
@@ -189,6 +191,31 @@ func TestHelperProcess(*testing.T) {
 		}
 		time.Sleep(time.Duration(l) * time.Second)
 	}
+	if args[0] == "exit" {
+		code, err := strconv.Atoi(args[1])
+		if err != nil {
+			os.Exit(1)
+		}
+		os.Exit(code)
+	}
+}
+
+func TestInterruptExit(t *testing.T) {
+	tests := []struct {
+		code int
+		want bool
+	}{
+		{0, false},
+		{1, false},
+		{130, true},
+	}
+	for _, test := range tests {
+		c := exec.Command(os.Args[0], "-test.run=TestHelperProcess", "--", "exit", strconv.Itoa(test.code))
+		c.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+		if got := interruptExit(c.Run()); got != test.want {
+			t.Errorf("interruptExit(exit status %d) got %v, want %v", test.code, got, test.want)
+		}
+	}
 }
 
 func TestValidateFileHash(t *testing.T) {
@@ -272,5 +299,83 @@ func TestAddJavaProps(t *testing.T) {
 
 	if err := s.Start(context.Background()); err != nil {
 		t.Errorf("Start got error: %v", err)
+	}
+}
+
+func TestDownloadURL(t *testing.T) {
+	tests := []struct {
+		version Version
+		want    string
+	}{
+		{Version121, "https://repo1.maven.org/maven2/org/apache/tika/tika-server/1.21/tika-server-1.21.jar"},
+		{Version260, "https://repo1.maven.org/maven2/org/apache/tika/tika-server-standard/2.6.0/tika-server-standard-2.6.0.jar"},
+		{Version332, "https://repo1.maven.org/maven2/org/apache/tika/tika-server-standard/3.3.2/tika-server-standard-3.3.2.jar"},
+	}
+	for _, test := range tests {
+		if got := downloadURL(test.version); got != test.want {
+			t.Errorf("downloadURL(%q) got %q, want %q", test.version, got, test.want)
+		}
+	}
+}
+
+func TestVersionsHaveSHA512(t *testing.T) {
+	isHex := regexp.MustCompile("^[0-9a-f]{128}$")
+	for _, v := range append(Versions, Version119, Version120, Version121) {
+		if !isHex.MatchString(sha512s[v]) {
+			t.Errorf("sha512s[%q] = %q, want 128 lowercase hex characters", v, sha512s[v])
+		}
+	}
+}
+
+func TestConfigPath(t *testing.T) {
+	oldCommand := command
+	defer func() { command = oldCommand }()
+
+	path, err := os.Executable() // Use the text executable path as a dummy jar.
+	if err != nil {
+		t.Skip("cannot find current test executable")
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, "Apache Tika 3.3.2")
+	}))
+	defer ts.Close()
+	tsURL, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatalf("error creating test server: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		configPath string
+		want       []string
+	}{
+		{"no config", "", nil},
+		{"config", "/tmp/tika-config.xml", []string{"-c", "/tmp/tika-config.xml"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s, err := NewServer(path, tsURL.Port())
+			if err != nil {
+				t.Fatalf("NewServer got error: %v", err)
+			}
+			s.ConfigPath = test.configPath
+
+			command = func(c string, args ...string) *exec.Cmd {
+				var got []string
+				for i, arg := range args {
+					if arg == "-c" && i+1 < len(args) {
+						got = args[i : i+2]
+					}
+				}
+				if !reflect.DeepEqual(got, test.want) {
+					t.Errorf("Start got %v %v args, want config args %v", c, args, test.want)
+				}
+				return oldCommand(c, args...)
+			}
+
+			if err := s.Start(context.Background()); err != nil {
+				t.Errorf("Start got error: %v", err)
+			}
+		})
 	}
 }
