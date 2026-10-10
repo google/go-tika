@@ -17,13 +17,16 @@ limitations under the License.
 package tika
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -249,6 +252,7 @@ func TestDownloadServerError(t *testing.T) {
 		path    string
 	}{
 		{"1.0", ""},
+		{Version410, ""},
 	}
 	for _, test := range tests {
 		if err := DownloadServer(context.Background(), test.version, test.path); err == nil {
@@ -310,11 +314,151 @@ func TestDownloadURL(t *testing.T) {
 		{Version121, "https://repo1.maven.org/maven2/org/apache/tika/tika-server/1.21/tika-server-1.21.jar"},
 		{Version260, "https://repo1.maven.org/maven2/org/apache/tika/tika-server-standard/2.6.0/tika-server-standard-2.6.0.jar"},
 		{Version332, "https://repo1.maven.org/maven2/org/apache/tika/tika-server-standard/3.3.2/tika-server-standard-3.3.2.jar"},
+		{Version410, "https://archive.apache.org/dist/tika/4.1.0/tika-server-standard-4.1.0.zip"},
 	}
 	for _, test := range tests {
 		if got := downloadURL(test.version); got != test.want {
 			t.Errorf("downloadURL(%q) got %q, want %q", test.version, got, test.want)
 		}
+	}
+}
+
+func TestMajorVersion(t *testing.T) {
+	tests := []struct {
+		version string
+		want    int
+	}{
+		{"1.21", 1},
+		{"3.3.2", 3},
+		{"4.1.0", 4},
+		{"4.2.0-SNAPSHOT", 4},
+		{"", 0},
+		{"unknown", 0},
+	}
+	for _, test := range tests {
+		if got := majorVersion(test.version); got != test.want {
+			t.Errorf("majorVersion(%q) got %d, want %d", test.version, got, test.want)
+		}
+	}
+}
+
+// writeZip writes a zip file at path containing files, a map from file name
+// to contents. Names ending in "/" are written as directories.
+func writeZip(t *testing.T, path string, files map[string]string) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	for name, contents := range files {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(w, contents); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// setSHA512 sets the sha512 for v to the hash of the file at path for the
+// duration of the test.
+func setSHA512(t *testing.T, v Version, path string) {
+	t.Helper()
+	hash, err := sha512Hash(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := sha512s[v]
+	sha512s[v] = hash
+	t.Cleanup(func() { sha512s[v] = old })
+}
+
+func TestDownloadServerDirZip(t *testing.T) {
+	dir := t.TempDir()
+	// A zip that is already in dir and has the correct sha512 is not downloaded.
+	writeZip(t, filepath.Join(dir, "tika-server-standard-4.1.0.zip"), map[string]string{
+		"bin/":                           "",
+		"lib/":                           "",
+		"lib/tika-core-4.1.0.jar":        "tika core",
+		"tika-server-standard-4.1.0.jar": "server",
+	})
+	setSHA512(t, Version410, filepath.Join(dir, "tika-server-standard-4.1.0.zip"))
+
+	wantJar := filepath.Join(dir, "tika-server-standard-4.1.0.jar")
+	wantFiles := map[string]string{
+		wantJar: "server",
+		filepath.Join(dir, "lib", "tika-core-4.1.0.jar"): "tika core",
+	}
+	checkFiles := func() {
+		t.Helper()
+		for path, want := range wantFiles {
+			got, err := os.ReadFile(path)
+			if err != nil {
+				t.Errorf("error reading extracted file: %v", err)
+				continue
+			}
+			if string(got) != want {
+				t.Errorf("extracted file %s got contents %q, want %q", path, got, want)
+			}
+		}
+	}
+
+	jar, err := DownloadServerDir(context.Background(), Version410, dir)
+	if err != nil {
+		t.Fatalf("DownloadServerDir got error: %v", err)
+	}
+	if jar != wantJar {
+		t.Errorf("DownloadServerDir got %q, want %q", jar, wantJar)
+	}
+	checkFiles()
+	if fi, err := os.Stat(filepath.Join(dir, "bin")); err != nil || !fi.IsDir() {
+		t.Errorf("DownloadServerDir did not extract the bin directory: %v", err)
+	}
+
+	// A missing JAR means extraction did not complete, so the zip is extracted again.
+	for path := range wantFiles {
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := DownloadServerDir(context.Background(), Version410, dir); err != nil {
+		t.Fatalf("DownloadServerDir got error: %v", err)
+	}
+	checkFiles()
+}
+
+func TestDownloadServerDirError(t *testing.T) {
+	tests := []Version{"1.0", Version121, Version332}
+	for _, v := range tests {
+		dir := filepath.Join(t.TempDir(), "server")
+		if _, err := DownloadServerDir(context.Background(), v, dir); err == nil {
+			t.Errorf("DownloadServerDir(%q) got no error, want an error", v)
+		}
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Errorf("DownloadServerDir(%q) created %s, want no directory", v, dir)
+		}
+	}
+}
+
+func TestUnzipInvalidPath(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "invalid.zip")
+	writeZip(t, src, map[string]string{"../outside.txt": "outside"})
+
+	dst := filepath.Join(dir, "dst")
+	if err := unzip(src, dst, ""); err == nil {
+		t.Error("unzip got no error, want an error for a path outside the directory")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "outside.txt")); !os.IsNotExist(err) {
+		t.Errorf("unzip wrote a file outside the directory: %v", err)
 	}
 }
 

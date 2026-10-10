@@ -299,6 +299,68 @@ func TestDetect(t *testing.T) {
 	}
 }
 
+func TestDetectServerVersions(t *testing.T) {
+	tests := []struct {
+		name          string
+		versionStatus int
+		version       string
+		wantPath      string
+	}{
+		{"Tika 2.x", http.StatusOK, "Apache Tika 2.9.4", "/detect/stream"},
+		{"Tika 3.x", http.StatusOK, "Apache Tika 3.3.2", "/detect/stream"},
+		{"Tika 4.x", http.StatusOK, "Apache Tika 4.1.0\n", "/detect"},
+		{"unknown version", http.StatusOK, "unknown", "/detect/stream"},
+		{"version error", http.StatusNotFound, "", "/detect/stream"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			want := "text/html"
+			versionCalls := 0
+			var gotPaths []string
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/version" {
+					versionCalls++
+					w.WriteHeader(test.versionStatus)
+					fmt.Fprint(w, test.version)
+					return
+				}
+				gotPaths = append(gotPaths, r.URL.Path)
+				if r.URL.Path != test.wantPath {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				fmt.Fprint(w, want)
+			}))
+			defer ts.Close()
+
+			c := NewClient(nil, ts.URL)
+			// Call Detect twice to check the server version is only requested once.
+			for i := 0; i < 2; i++ {
+				got, err := c.Detect(context.Background(), strings.NewReader("<html></html>"))
+				if err != nil {
+					t.Fatalf("Detect returned an error: %v, want %q", err, want)
+				}
+				if got != want {
+					t.Errorf("Detect got %q, want %q", got, want)
+				}
+			}
+			if versionCalls != 1 {
+				t.Errorf("Detect called /version %d times, want 1", versionCalls)
+			}
+			if wantPaths := []string{test.wantPath, test.wantPath}; !reflect.DeepEqual(gotPaths, wantPaths) {
+				t.Errorf("Detect called %v, want %v", gotPaths, wantPaths)
+			}
+		})
+	}
+}
+
+func TestDetectConnectionError(t *testing.T) {
+	c := NewClient(nil, "https://unknown_test_url")
+	if _, err := c.Detect(context.Background(), nil); err == nil {
+		t.Error("Detect got no error, want an error")
+	}
+}
+
 func TestLanguage(t *testing.T) {
 	// Tika 4.x: /language returns 200, /language/stream is not used.
 	{
