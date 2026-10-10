@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -299,34 +300,34 @@ func TestDetect(t *testing.T) {
 	}
 }
 
-func TestDetectServerVersions(t *testing.T) {
+func TestDetectFallback(t *testing.T) {
 	tests := []struct {
-		name          string
-		versionStatus int
-		version       string
-		wantPath      string
+		name         string
+		detectStatus int
+		wantPaths    []string
+		wantErr      bool
 	}{
-		{"Tika 2.x", http.StatusOK, "Apache Tika 2.9.4", "/detect/stream"},
-		{"Tika 3.x", http.StatusOK, "Apache Tika 3.3.2", "/detect/stream"},
-		{"Tika 4.x", http.StatusOK, "Apache Tika 4.1.0\n", "/detect"},
-		{"unknown version", http.StatusOK, "unknown", "/detect/stream"},
-		{"version error", http.StatusNotFound, "", "/detect/stream"},
+		{"Tika 4.x", http.StatusOK, []string{"/detect"}, false},
+		{"legacy 404", http.StatusNotFound, []string{"/detect", "/detect/stream"}, false},
+		{"legacy 405", http.StatusMethodNotAllowed, []string{"/detect", "/detect/stream"}, false},
+		{"server error", http.StatusInternalServerError, []string{"/detect"}, true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			input := "<html></html>"
 			want := "text/html"
-			versionCalls := 0
 			var gotPaths []string
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/version" {
-					versionCalls++
-					w.WriteHeader(test.versionStatus)
-					fmt.Fprint(w, test.version)
-					return
-				}
 				gotPaths = append(gotPaths, r.URL.Path)
-				if r.URL.Path != test.wantPath {
-					w.WriteHeader(http.StatusNotFound)
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Errorf("error reading request body: %v", err)
+				}
+				if string(body) != input {
+					t.Errorf("%s got body %q, want %q", r.URL.Path, body, input)
+				}
+				if r.URL.Path == "/detect" && test.detectStatus != http.StatusOK {
+					w.WriteHeader(test.detectStatus)
 					return
 				}
 				fmt.Fprint(w, want)
@@ -334,21 +335,15 @@ func TestDetectServerVersions(t *testing.T) {
 			defer ts.Close()
 
 			c := NewClient(nil, ts.URL)
-			// Call Detect twice to check the server version is only requested once.
-			for i := 0; i < 2; i++ {
-				got, err := c.Detect(context.Background(), strings.NewReader("<html></html>"))
-				if err != nil {
-					t.Fatalf("Detect returned an error: %v, want %q", err, want)
-				}
-				if got != want {
-					t.Errorf("Detect got %q, want %q", got, want)
-				}
+			got, err := c.Detect(context.Background(), strings.NewReader(input))
+			if gotErr := err != nil; gotErr != test.wantErr {
+				t.Fatalf("Detect got error %v, want error: %v", err, test.wantErr)
 			}
-			if versionCalls != 1 {
-				t.Errorf("Detect called /version %d times, want 1", versionCalls)
+			if !test.wantErr && got != want {
+				t.Errorf("Detect got %q, want %q", got, want)
 			}
-			if wantPaths := []string{test.wantPath, test.wantPath}; !reflect.DeepEqual(gotPaths, wantPaths) {
-				t.Errorf("Detect called %v, want %v", gotPaths, wantPaths)
+			if !reflect.DeepEqual(gotPaths, test.wantPaths) {
+				t.Errorf("Detect called %v, want %v", gotPaths, test.wantPaths)
 			}
 		})
 	}

@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
-	"sync"
 )
 
 // ClientError is returned by Client's various parse methods and
@@ -63,12 +62,6 @@ type Client struct {
 	// client is specified, a default client will be used. Since http.Clients are
 	// thread safe, the same client will be used for all requests by this Client.
 	httpClient *http.Client
-
-	// mu guards serverMajor.
-	mu sync.Mutex
-	// serverMajor is the major version of the Tika Server, 0 if it is not yet
-	// known, or -1 if the server did not report a version that could be parsed.
-	serverMajor int
 }
 
 // NewClient creates a new Client. If httpClient is nil, the http.DefaultClient will be
@@ -245,42 +238,25 @@ func (c *Client) MetaFieldWithHeader(ctx context.Context, input io.Reader, field
 
 // Detect gets the mimetype of the given input, returning the mimetype and an
 // error. If the error is not nil, the mimetype is undefined.
-// The first call to Detect also calls Version, because the endpoint used
-// depends on the Tika Server version.
 func (c *Client) Detect(ctx context.Context, input io.Reader) (string, error) {
-	major, err := c.serverMajorVersion(ctx)
+	var r1, r2 io.Reader
+	if input != nil {
+		buf, err := io.ReadAll(input)
+		if err != nil {
+			return "", err
+		}
+		r1 = bytes.NewReader(buf)
+		r2 = bytes.NewReader(buf)
+	}
+	res, err := c.callString(ctx, r1, "PUT", "/detect", nil)
 	if err != nil {
+		var clientErr ClientError
+		if errors.As(err, &clientErr) && (clientErr.StatusCode == http.StatusNotFound || clientErr.StatusCode == http.StatusMethodNotAllowed) {
+			return c.callString(ctx, r2, "PUT", "/detect/stream", nil)
+		}
 		return "", err
 	}
-	// Tika Server 4.x moved /detect/stream to /detect.
-	path := "/detect/stream"
-	if major >= 4 {
-		path = "/detect"
-	}
-	return c.callString(ctx, input, "PUT", path, nil)
-}
-
-// serverMajorVersion returns the major version of the Tika Server, calling
-// Version the first time it is needed and caching the result. It returns -1
-// if the server responds to Version with an error status or a version that
-// cannot be parsed.
-func (c *Client) serverMajorVersion(ctx context.Context) (int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.serverMajor != 0 {
-		return c.serverMajor, nil
-	}
-	v, err := c.Version(ctx)
-	var clientErr ClientError
-	if err != nil && !errors.As(err, &clientErr) {
-		return 0, err
-	}
-	// Tika Server responds with a message such as "Apache Tika 4.1.0".
-	c.serverMajor = majorVersion(strings.TrimPrefix(strings.TrimSpace(v), "Apache Tika "))
-	if c.serverMajor == 0 {
-		c.serverMajor = -1
-	}
-	return c.serverMajor, nil
+	return res, nil
 }
 
 // Language detects the language of the given input, returning the two letter
