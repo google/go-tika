@@ -33,3 +33,27 @@ jobs:
         with:
           go-version: 'stable'
       - run: go test ./...
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tika-version: ['1.19', '1.20', '1.21', '2.6.0', '2.7.0', '2.8.0', '2.9.4', '3.0.0', '3.1.0', '3.2.3', '3.3.2', '4.1.0']
+    env:
+      TIKA_VERSION: ${{ matrix.tika-version }}
+      TIKA_JAR_DIR: ${{ github.workspace }}/.tika
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - run: mkdir -p "$TIKA_JAR_DIR"
+      - uses: actions/cache@v4
+        with:
+          path: .tika
+          key: tika-server-${{ matrix.tika-version }}
+      - run: go test -tags integration -run Integration -v ./tika/
